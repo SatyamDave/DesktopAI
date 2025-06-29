@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Settings, MessageCircle, Zap, Eye, EyeOff, X } from 'lucide-react';
+import { Sparkles, Settings, MessageCircle, Zap, Eye, X } from 'lucide-react';
 
 interface FloatingOrbProps {}
 

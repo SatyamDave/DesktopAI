@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Settings as SettingsIcon, 
-  Shield, 
-  Eye, 
-  Mic, 
-  Keyboard, 
-  Palette,
-  Database,
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Settings as SettingsIcon,
+  Sun,
+  Monitor,
+  Smartphone,
   Bell,
-  Zap,
-  Moon
+  Shield,
+  Lock,
+  Database,
+  RefreshCw
 } from 'lucide-react';
 
 interface SettingsProps {}
@@ -68,8 +67,8 @@ const Settings: React.FC<SettingsProps> = () => {
   const tabs = [
     { id: 'general', label: 'General', icon: <SettingsIcon size={16} /> },
     { id: 'privacy', label: 'Privacy', icon: <Shield size={16} /> },
-    { id: 'features', label: 'Features', icon: <Zap size={16} /> },
-    { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
+    { id: 'features', label: 'Features', icon: <RefreshCw size={16} /> },
+    { id: 'appearance', label: 'Appearance', icon: <Sun size={16} /> },
     { id: 'stats', label: 'Statistics', icon: <Database size={16} /> }
   ];
 
@@ -121,7 +120,7 @@ const Settings: React.FC<SettingsProps> = () => {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between p-4 glass rounded-lg">
                           <div className="flex items-center space-x-3">
-                            <Keyboard className="text-indigo-400" size={20} />
+                            <Monitor className="text-indigo-400" size={20} />
                             <div>
                               <h3 className="text-white font-medium">Global Hotkey</h3>
                               <p className="text-gray-400 text-sm">Shortcut to open Doppel</p>
@@ -156,7 +155,7 @@ const Settings: React.FC<SettingsProps> = () => {
 
                         <div className="flex items-center justify-between p-4 glass rounded-lg">
                           <div className="flex items-center space-x-3">
-                            <Zap className="text-indigo-400" size={20} />
+                            <RefreshCw className="text-indigo-400" size={20} />
                             <div>
                               <h3 className="text-white font-medium">Auto-start</h3>
                               <p className="text-gray-400 text-sm">Launch Doppel on system startup</p>
@@ -183,7 +182,7 @@ const Settings: React.FC<SettingsProps> = () => {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between p-4 glass rounded-lg">
                           <div className="flex items-center space-x-3">
-                            <Eye className="text-indigo-400" size={20} />
+                            <Monitor className="text-indigo-400" size={20} />
                             <div>
                               <h3 className="text-white font-medium">Behavior Tracking</h3>
                               <p className="text-gray-400 text-sm">Learn from your usage patterns</p>
@@ -221,7 +220,7 @@ const Settings: React.FC<SettingsProps> = () => {
 
                         <div className="flex items-center justify-between p-4 glass rounded-lg">
                           <div className="flex items-center space-x-3">
-                            <Shield className="text-indigo-400" size={20} />
+                            <Lock className="text-indigo-400" size={20} />
                             <div>
                               <h3 className="text-white font-medium">Privacy Mode</h3>
                               <p className="text-gray-400 text-sm">Stop all tracking and learning</p>
@@ -263,7 +262,7 @@ const Settings: React.FC<SettingsProps> = () => {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between p-4 glass rounded-lg">
                           <div className="flex items-center space-x-3">
-                            <Mic className="text-indigo-400" size={20} />
+                            <Smartphone className="text-indigo-400" size={20} />
                             <div>
                               <h3 className="text-white font-medium">Whisper Mode</h3>
                               <p className="text-gray-400 text-sm">Interview assistance during meetings</p>

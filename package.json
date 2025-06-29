@@ -11,7 +11,9 @@
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
     "dist": "electron-builder",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "type-check": "tsc --noEmit",
+    "lint": "echo 'No linter configured yet'"
   },
   "keywords": [
     "ai",

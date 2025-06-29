@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import FloatingOrb from './components/FloatingOrb';
 import { FeatureTest } from './components/FeatureTest';
 import './index.css';

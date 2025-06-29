@@ -2,6 +2,7 @@ import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { CommandExecutor } from './CommandExecutor';
 
 interface Conversation {
   id: number;
@@ -26,6 +27,7 @@ export class AIProcessor {
   private sqlJS: SqlJsStatic | null = null;
   private dbPath: string;
   private commands: Map<string, Command> = new Map();
+  private commandExecutor: CommandExecutor;
 
   constructor() {
     const dbDir = path.join(os.homedir(), '.doppel');
@@ -33,6 +35,7 @@ export class AIProcessor {
       fs.mkdirSync(dbDir, { recursive: true });
     }
     this.dbPath = path.join(dbDir, 'ai.sqlite');
+    this.commandExecutor = new CommandExecutor();
   }
 
   public async init() {
@@ -98,6 +101,8 @@ export class AIProcessor {
   public async processInput(input: string, context?: any): Promise<string> {
     if (!this.db) await this.init();
     try {
+      console.log(`🤖 Processing input: "${input}"`);
+      
       const conversation: Conversation = {
         id: 0,
         user_input: input,
@@ -106,28 +111,43 @@ export class AIProcessor {
         context: context ? JSON.stringify(context) : '',
         intent: this.detectIntent(input)
       };
-      const response = await this.generateResponse(input, context);
+
+      // Use CommandExecutor for actual command execution
+      const commandResult = await this.commandExecutor.executeCommand(input);
+      
+      // Generate AI response based on command result
+      const response = this.generateAIResponse(input, commandResult, context);
       conversation.ai_response = response;
+      
+      // Save conversation to database
       this.db!.run(
         'INSERT INTO conversations (user_input, ai_response, timestamp, context, intent) VALUES (?, ?, ?, ?, ?)',
         [conversation.user_input, conversation.ai_response, conversation.timestamp, conversation.context, conversation.intent]
       );
       this.saveToDisk();
+      
+      console.log(`✅ Command processed successfully: ${commandResult.success}`);
       return response;
     } catch (error) {
       console.error('Error processing input:', error);
-      return 'I apologize, but I encountered an error processing your request.';
+      return 'I apologize, but I encountered an error processing your request. Please try again.';
     }
   }
 
   private detectIntent(input: string): string {
     const lowerInput = input.toLowerCase();
     
-    if (lowerInput.includes('open') || lowerInput.includes('launch')) {
+    if (lowerInput.includes('open') || lowerInput.includes('launch') || lowerInput.includes('start')) {
       return 'app_launch';
     }
-    if (lowerInput.includes('search') || lowerInput.includes('find')) {
+    if (lowerInput.includes('search') || lowerInput.includes('find') || lowerInput.includes('google')) {
       return 'search';
+    }
+    if (lowerInput.includes('youtube') || lowerInput.includes('video')) {
+      return 'youtube_search';
+    }
+    if (lowerInput.includes('email') || lowerInput.includes('mail') || lowerInput.includes('send')) {
+      return 'email';
     }
     if (lowerInput.includes('copy') || lowerInput.includes('clipboard')) {
       return 'clipboard';
@@ -142,108 +162,31 @@ export class AIProcessor {
     return 'general';
   }
 
-  private async generateResponse(input: string, context?: any): Promise<string> {
-    const intent = this.detectIntent(input);
-    const lowerInput = input.toLowerCase();
-
-    switch (intent) {
-      case 'app_launch':
-        return this.handleAppLaunch(input);
+  private generateAIResponse(input: string, commandResult: any, context?: any): string {
+    if (commandResult.success) {
+      // Command was executed successfully
+      return commandResult.message;
+    } else {
+      // Command failed, provide helpful response
+      const intent = this.detectIntent(input);
       
-      case 'search':
-        return this.handleSearch(input);
-      
-      case 'clipboard':
-        return this.handleClipboard(input);
-      
-      case 'scheduling':
-        return this.handleScheduling(input);
-      
-      case 'help':
-        return this.getHelpResponse();
-      
-      default:
-        return this.handleGeneralQuery(input, context);
-    }
-  }
-
-  private handleAppLaunch(input: string): string {
-    const apps = [
-      { name: 'chrome', aliases: ['browser', 'google chrome', 'web browser'] },
-      { name: 'notepad', aliases: ['text editor', 'notes'] },
-      { name: 'calculator', aliases: ['calc', 'math'] },
-      { name: 'explorer', aliases: ['file explorer', 'files', 'folder'] },
-      { name: 'spotify', aliases: ['music', 'audio'] },
-      { name: 'discord', aliases: ['chat', 'communication'] },
-      { name: 'vscode', aliases: ['code', 'visual studio code', 'editor'] }
-    ];
-
-    for (const app of apps) {
-      if (app.aliases.some(alias => input.toLowerCase().includes(alias))) {
-        return `I'll help you open ${app.name}. You can use the command: "open ${app.name}" or I can assist with launching it directly.`;
+      switch (intent) {
+        case 'app_launch':
+          return `I couldn't launch that application. ${commandResult.message} Try saying "open Chrome", "launch Notepad", or "start Calculator".`;
+        
+        case 'search':
+          return `I couldn't perform that search. ${commandResult.message} Try saying "search for React tutorials" or "find TypeScript documentation".`;
+        
+        case 'youtube_search':
+          return `I couldn't search YouTube. ${commandResult.message} Try saying "YouTube React tutorial" or "video Logan Paul".`;
+        
+        case 'email':
+          return `I couldn't open your email client. ${commandResult.message} Make sure you have a default email application configured.`;
+        
+        default:
+          return commandResult.message || 'I understand your request, but I need more specific instructions. Try saying "open Chrome" or "search for something".';
       }
     }
-
-    return 'I can help you open applications. Try saying "open [application name]" or "launch [application name]".';
-  }
-
-  private handleSearch(input: string): string {
-    const searchTerms = input.toLowerCase().replace(/search|find/g, '').trim();
-    if (searchTerms) {
-      return `I'll help you search for "${searchTerms}". You can search the web, your files, or clipboard history. What would you like to search?`;
-    }
-    return 'What would you like me to search for? I can search the web, your files, or clipboard history.';
-  }
-
-  private handleClipboard(input: string): string {
-    if (input.toLowerCase().includes('history')) {
-      return 'I can show you your clipboard history. You can also search through it or clear it if needed.';
-    }
-    if (input.toLowerCase().includes('clear')) {
-      return 'I can help you clear your clipboard history. Would you like me to do that now?';
-    }
-    return 'I can help you manage your clipboard. I can show history, search through it, or help you copy/paste items.';
-  }
-
-  private handleScheduling(input: string): string {
-    return 'I can help you schedule tasks and set reminders. What would you like to schedule?';
-  }
-
-  private getHelpResponse(): string {
-    return `I'm Doppel, your AI assistant! Here's what I can help you with:
-
-• **Open applications**: "Open Chrome", "Launch Notepad"
-• **Search**: "Search for files", "Find documents"
-• **Clipboard management**: "Show clipboard history", "Search clipboard"
-• **Scheduling**: "Remind me to call mom", "Schedule meeting"
-• **General assistance**: Ask me anything!
-
-Just type your request and I'll help you get things done!`;
-  }
-
-  private async handleGeneralQuery(input: string, context?: any): Promise<string> {
-    // Simple response generation based on input patterns
-    if (input.toLowerCase().includes('hello') || input.toLowerCase().includes('hi')) {
-      return 'Hello! I\'m Doppel, your AI assistant. How can I help you today?';
-    }
-    
-    if (input.toLowerCase().includes('time')) {
-      return `The current time is ${new Date().toLocaleTimeString()}.`;
-    }
-    
-    if (input.toLowerCase().includes('date')) {
-      return `Today is ${new Date().toLocaleDateString()}.`;
-    }
-    
-    if (input.toLowerCase().includes('weather')) {
-      return 'I can help you check the weather. Would you like me to look up the current weather for your location?';
-    }
-    
-    if (input.toLowerCase().includes('thank')) {
-      return 'You\'re welcome! Is there anything else I can help you with?';
-    }
-
-    return 'I understand you\'re asking about "' + input + '". I\'m here to help! Could you be more specific about what you\'d like me to do?';
   }
 
   public async getConversationHistory(limit = 20): Promise<Conversation[]> {
