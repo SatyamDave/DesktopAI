@@ -284,3 +284,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ---
 
 **Doppel** - Your intelligent desktop companion. 🚀 
+
+
+WTF IS HAPPENING
