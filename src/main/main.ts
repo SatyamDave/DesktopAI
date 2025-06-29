@@ -15,7 +15,7 @@ class DoppelApp {
   private aiProcessor: AIProcessor;
   private whisperMode: WhisperMode;
   private commandExecutor: CommandExecutor;
-  private isDev = process.env.NODE_ENV === 'development';
+  private isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
   constructor() {
     this.clipboardManager = new ClipboardManager();
@@ -23,6 +23,9 @@ class DoppelApp {
     this.aiProcessor = new AIProcessor();
     this.whisperMode = new WhisperMode();
     this.commandExecutor = new CommandExecutor();
+    
+    console.log(`🔧 Development mode: ${this.isDev}`);
+    console.log(`📦 App packaged: ${app.isPackaged}`);
     
     this.initializeApp();
   }
@@ -99,26 +102,78 @@ class DoppelApp {
     const { width, height } = screen.getPrimaryDisplay().workAreaSize;
     
     this.floatingWindow = new BrowserWindow({
-      width: 60,
-      height: 60,
-      x: width - 80,
-      y: height - 80,
-      frame: false,
-      transparent: true,
-      alwaysOnTop: true,
-      skipTaskbar: true,
-      resizable: false,
+      width: 800,
+      height: 600,
+      x: Math.floor((width - 800) / 2),
+      y: Math.floor((height - 600) / 2),
+      frame: true,
+      transparent: false,
+      alwaysOnTop: false,
+      skipTaskbar: false,
+      resizable: true,
+      minimizable: true,
+      maximizable: true,
+      show: false,
       webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false
       }
     });
 
+    // Try different ports for dev server
+    const devUrls = [
+      'http://localhost:3000',  // Vite default port
+      'http://localhost:5173',  // Vite alternative port
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'http://localhost:3003',
+      'http://localhost:3004',
+      'http://localhost:3005'
+    ];
+    
     const url = this.isDev 
-      ? 'http://localhost:3000' 
+      ? devUrls[0] // Use 3000 first since that's what Vite is using
       : `file://${path.join(__dirname, '../renderer/index.html')}`;
     
+    console.log(`🚀 Loading URL: ${url}`);
     this.floatingWindow.loadURL(url);
+
+    // Show the window when it's ready
+    this.floatingWindow.once('ready-to-show', () => {
+      console.log('✅ Window ready to show');
+      this.floatingWindow?.show();
+      this.floatingWindow?.focus();
+    });
+
+    // Fallback: show window after a timeout if ready-to-show doesn't fire
+    setTimeout(() => {
+      if (this.floatingWindow && !this.floatingWindow.isVisible()) {
+        console.log('⏰ Fallback: showing window after timeout');
+        this.floatingWindow.show();
+        this.floatingWindow.focus();
+      }
+    }, 3000);
+
+    // Handle load errors
+    this.floatingWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+      console.error(`❌ Failed to load ${validatedURL}: ${errorDescription}`);
+      
+      // Try next URL if in dev mode
+      if (this.isDev) {
+        const currentIndex = devUrls.indexOf(validatedURL);
+        if (currentIndex < devUrls.length - 1) {
+          const nextUrl = devUrls[currentIndex + 1];
+          console.log(`🔄 Trying next URL: ${nextUrl}`);
+          this.floatingWindow?.loadURL(nextUrl);
+        }
+      }
+    });
+
+    // Add load success handler
+    this.floatingWindow.webContents.on('did-finish-load', () => {
+      console.log('✅ Page finished loading');
+    });
 
     // Prevent window from being closed
     this.floatingWindow.on('close', (event) => {
@@ -126,10 +181,10 @@ class DoppelApp {
       this.floatingWindow?.hide();
     });
 
-    // Hide on blur (click outside)
-    this.floatingWindow.on('blur', () => {
-      this.floatingWindow?.hide();
-    });
+    // Don't hide on blur - let user interact with it
+    // this.floatingWindow.on('blur', () => {
+    //   this.floatingWindow?.hide();
+    // });
   }
 
   private setupGlobalShortcuts() {
@@ -324,13 +379,14 @@ class DoppelApp {
       alwaysOnTop: true,
       skipTaskbar: true,
       webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false
       }
     });
 
     const url = this.isDev 
-      ? 'http://localhost:3000/command' 
+      ? 'http://localhost:3003/command' 
       : `file://${path.join(__dirname, '../renderer/index.html')}#/command`;
     
     commandWindow.loadURL(url);
@@ -357,13 +413,14 @@ class DoppelApp {
         width: 800,
         height: 600,
         webPreferences: {
-          nodeIntegration: true,
-          contextIsolation: false
+          preload: path.join(__dirname, 'preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false
         }
       });
 
       const url = this.isDev 
-        ? 'http://localhost:3000/settings' 
+        ? 'http://localhost:3003/settings' 
         : `file://${path.join(__dirname, '../renderer/index.html')}#/settings`;
       
       this.mainWindow.loadURL(url);
