@@ -25,4 +25,6 @@ declare module 'node-global-key-listener' {
     start(): void;
     stop(): void;
   }
-} 
+}
+
+declare module 'sql.js'; 

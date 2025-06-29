@@ -176,6 +176,14 @@ setTimeout(() => {
   console.log(`   • Command history and autocomplete suggestions`);
   console.log(`   • Command queue for sequential execution`);
   console.log(`   • Comprehensive feature test suite`);
+  console.log(`   • Enhanced app/action mapping (50+ apps)`);
+  console.log(`   • Browser automation (search in specific browsers)`);
+  console.log(`   • Network operations (ping, internet check, download)`);
+  console.log(`   • Process management (kill, list, task manager)`);
+  console.log(`   • Automation operations (screenshot, recording, scheduling)`);
+  console.log(`   • Utility operations (system info, status, memory, disk)`);
+  console.log(`   • Advanced UI with animations and accessibility`);
+  console.log(`   • Enhanced glassmorphism and visual effects`);
   
   console.log(`\n🎯 Automation Features:`);
   console.log(`   • "Open Chrome" → Launches browser`);
@@ -183,6 +191,13 @@ setTimeout(() => {
   console.log(`   • "YouTube Logan Paul" → Opens YouTube search`);
   console.log(`   • "Email manager asking for time off" → Opens email client`);
   console.log(`   • "Open Zoom and then Notion" → Sequential execution`);
+  console.log(`   • "Search React in Chrome" → Browser-specific search`);
+  console.log(`   • "Ping google.com" → Network connectivity test`);
+  console.log(`   • "Check internet" → Connection verification`);
+  console.log(`   • "Take screenshot" → Screen capture`);
+  console.log(`   • "System info" → Detailed system information`);
+  console.log(`   • "Kill process notepad.exe" → Process termination`);
+  console.log(`   • "Download file to Desktop" → File downloads`);
   console.log(`   • Command history with success/failure tracking`);
   console.log(`   • Smart autocomplete based on previous commands`);
   

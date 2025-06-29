@@ -1,5 +1,15 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, screen, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
+import * as dotenv from 'dotenv';
+console.log('Loading .env from:', path.resolve(__dirname, '../../.env'));
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+console.log('DEBUG ENV:', {
+  AZURE_OPENAI_API_KEY: process.env.AZURE_OPENAI_API_KEY,
+  AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
+  AZURE_OPENAI_DEPLOYMENT_NAME: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
+  AZURE_OPENAI_API_VERSION: process.env.AZURE_OPENAI_API_VERSION,
+  TEST_ENV_VAR: process.env.TEST_ENV_VAR,
+});
+import { app, BrowserWindow, globalShortcut, ipcMain, screen, Tray, Menu, nativeImage } from 'electron';
 import { ClipboardManager } from './services/ClipboardManager';
 import { BehaviorTracker } from './services/BehaviorTracker';
 import { AIProcessor } from './services/AIProcessor';

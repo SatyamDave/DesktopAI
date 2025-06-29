@@ -1,8 +1,10 @@
-import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
+import initSqlJs from 'sql.js';
+import type { Database, SqlJsStatic } from 'sql.js';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { CommandExecutor } from './CommandExecutor';
+import { ConfigManager } from './ConfigManager';
 
 interface Conversation {
   id: number;
@@ -28,8 +30,12 @@ export class AIProcessor {
   private dbPath: string;
   private commands: Map<string, Command> = new Map();
   private commandExecutor: CommandExecutor;
+  private configManager: ConfigManager;
+  private debug: boolean;
 
   constructor() {
+    this.configManager = new ConfigManager();
+    this.debug = this.configManager.isDebugMode();
     const dbDir = path.join(os.homedir(), '.doppel');
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
@@ -101,8 +107,7 @@ export class AIProcessor {
   public async processInput(input: string, context?: any): Promise<string> {
     if (!this.db) await this.init();
     try {
-      console.log(`🤖 Processing input: "${input}"`);
-      
+      if (this.debug) console.log(`[AIProcessor] Processing input: "${input}"`);
       const conversation: Conversation = {
         id: 0,
         user_input: input,
@@ -111,25 +116,21 @@ export class AIProcessor {
         context: context ? JSON.stringify(context) : '',
         intent: this.detectIntent(input)
       };
-
       // Use CommandExecutor for actual command execution
       const commandResult = await this.commandExecutor.executeCommand(input);
-      
       // Generate AI response based on command result
       const response = this.generateAIResponse(input, commandResult, context);
       conversation.ai_response = response;
-      
       // Save conversation to database
       this.db!.run(
         'INSERT INTO conversations (user_input, ai_response, timestamp, context, intent) VALUES (?, ?, ?, ?, ?)',
         [conversation.user_input, conversation.ai_response, conversation.timestamp, conversation.context, conversation.intent]
       );
       this.saveToDisk();
-      
-      console.log(`✅ Command processed successfully: ${commandResult.success}`);
+      if (this.debug) console.log(`[AIProcessor] Command processed: success=${commandResult.success}`);
       return response;
     } catch (error) {
-      console.error('Error processing input:', error);
+      console.error('[AIProcessor] Error processing input:', error);
       return 'I apologize, but I encountered an error processing your request. Please try again.';
     }
   }
