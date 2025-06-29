@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getUserContext: () => ipcRenderer.invoke('get-user-context'),
   toggleWhisperMode: (enabled: boolean) => ipcRenderer.invoke('toggle-whisper-mode', enabled),
   getAppStatus: () => ipcRenderer.invoke('get-app-status'),
+  getEmailDraftHistory: (limit?: number) => ipcRenderer.invoke('get-email-draft-history', limit),
 }); 

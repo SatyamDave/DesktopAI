@@ -17,6 +17,7 @@ declare global {
       }>;
       toggleWhisperMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
       getAppStatus: () => Promise<{ success: boolean; status?: any; error?: string }>;
+      getEmailDraftHistory: (limit?: number) => Promise<{ success: boolean; history?: any[]; error?: string }>;
     };
   }
 }

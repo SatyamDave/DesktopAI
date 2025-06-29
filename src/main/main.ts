@@ -229,6 +229,17 @@ class DoppelApp {
     ipcMain.handle('execute-command', async (event, command: string) => {
       try {
         console.log(`🎯 Executing command via IPC: "${command}"`);
+        
+        // Check if this is an email composition request
+        const lowerCommand = command.toLowerCase();
+        if (lowerCommand.includes('email') || lowerCommand.includes('mail') || lowerCommand.includes('send') || 
+            lowerCommand.includes('compose') || lowerCommand.includes('draft')) {
+          console.log(`📧 Email composition detected, routing to AIProcessor`);
+          const result = await this.aiProcessor.processInput(command);
+          return { success: true, result, data: { type: 'email_composition' } };
+        }
+        
+        // Handle regular commands
         const result = await this.commandExecutor.executeCommand(command);
         console.log(`✅ Command execution result:`, result);
         return { success: true, result: result.message, data: result.data };
@@ -346,12 +357,14 @@ class DoppelApp {
     ipcMain.handle('get-app-status', async () => {
       try {
         const whisperStatus = this.whisperMode.getStatus();
+        const aiConfigured = this.aiProcessor.isOpenAIConfigured();
         return {
           success: true,
           status: {
             clipboardManager: true,
             behaviorTracker: true,
             aiProcessor: true,
+            openaiConfigured: aiConfigured,
             whisperMode: whisperStatus.isActive,
             commandExecutor: true
           }
@@ -359,6 +372,17 @@ class DoppelApp {
       } catch (error) {
         console.error('❌ Error getting app status:', error);
         return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // Handle email draft history
+    ipcMain.handle('get-email-draft-history', async (event, limit = 20) => {
+      try {
+        const history = await this.aiProcessor.getEmailDraftHistory(limit);
+        return { success: true, history };
+      } catch (error) {
+        console.error('❌ Error getting email draft history:', error);
+        return { success: false, error: (error as Error).message, history: [] };
       }
     });
   }
