@@ -114,6 +114,13 @@ export class CommandExecutor {
     this.loadCommandHistory();
   }
 
+  private log(message: string, data?: any) {
+    const logFile = path.join(os.homedir(), '.doppel', 'doppel.log');
+    const logMsg = `[${new Date().toISOString()}] ${message}${data ? ' ' + JSON.stringify(data) : ''}\n`;
+    fs.appendFileSync(logFile, logMsg);
+    console.log(message, data || '');
+  }
+
   private loadCommandHistory() {
     try {
       if (fs.existsSync(this.historyFile)) {
@@ -121,20 +128,19 @@ export class CommandExecutor {
         this.commandHistory = JSON.parse(data);
       }
     } catch (error) {
-      console.error('Error loading command history:', error);
+      this.log('Error loading command history', error);
       this.commandHistory = [];
     }
   }
 
   private saveCommandHistory() {
     try {
-      // Keep only the last maxHistorySize commands
       if (this.commandHistory.length > this.maxHistorySize) {
         this.commandHistory = this.commandHistory.slice(-this.maxHistorySize);
       }
       fs.writeFileSync(this.historyFile, JSON.stringify(this.commandHistory, null, 2));
     } catch (error) {
-      console.error('Error saving command history:', error);
+      this.log('Error saving command history', error);
     }
   }
 
@@ -149,23 +155,55 @@ export class CommandExecutor {
   }
 
   public async executeCommand(input: string): Promise<CommandResult> {
-    const lowerInput = input.toLowerCase().trim();
-    console.log(`🔧 Executing command: "${input}"`);
+    this.log('Received command', { input });
+    // Support multi-step/compound commands: split by 'and then', 'then', 'and'
+    const steps = input.split(/\band then\b|\bthen\b|\band\b/i).map(s => s.trim()).filter(Boolean);
+    if (steps.length > 1) {
+      const results: CommandResult[] = [];
+      for (const step of steps) {
+        const result = await this.executeSingleCommand(step);
+        results.push(result);
+        // Show toast for each step
+        this.log('Step result', { step, result });
+      }
+      // Return summary
+      const allSuccess = results.every(r => r.success);
+      const summary = results.map(r => r.message).join(' | ');
+      return { success: allSuccess, message: summary, data: results };
+    } else {
+      return this.executeSingleCommand(input);
+    }
+  }
 
+  private async executeSingleCommand(input: string): Promise<CommandResult> {
+    const lowerInput = input.toLowerCase().trim();
     try {
-      // App launch commands
-      if (lowerInput.includes('open') || lowerInput.includes('launch') || lowerInput.includes('start')) {
+      // Open app and go to URL (e.g., "Open Chrome and go to gmail.com")
+      const openAppUrlMatch = lowerInput.match(/open (\w+)(?: and go to ([^ ]+))/i);
+      if (openAppUrlMatch) {
+        const appName = openAppUrlMatch[1];
+        const url = openAppUrlMatch[2].startsWith('http') ? openAppUrlMatch[2] : `https://${openAppUrlMatch[2]}`;
+        const appResult = await this.handleAppLaunch(`open ${appName}`);
+        if (appResult.success) {
+          await shell.openExternal(url);
+          this.addToHistory(input, true, `Opened ${appName} and navigated to ${url}`);
+          this.log('App+URL success', { appName, url });
+          return { success: true, message: `Opened ${appName} and navigated to ${url}` };
+        } else {
+          this.addToHistory(input, false, appResult.message);
+          this.log('App+URL failed', { appName, url, error: appResult.message });
+          return { success: false, message: appResult.message };
+        }
+      }
+
+      // App launch
+      if (lowerInput.startsWith('open') || lowerInput.startsWith('launch') || lowerInput.startsWith('start')) {
         return await this.handleAppLaunch(input);
       }
 
-      // Web search commands
-      if (lowerInput.includes('search') || lowerInput.includes('find') || lowerInput.includes('google')) {
+      // Web search
+      if (lowerInput.startsWith('search') || lowerInput.startsWith('find') || lowerInput.includes('google')) {
         return await this.handleWebSearch(input);
-      }
-
-      // Email commands
-      if (lowerInput.includes('email') || lowerInput.includes('mail') || lowerInput.includes('send')) {
-        return await this.handleEmailDraft(input);
       }
 
       // YouTube search
@@ -173,86 +211,65 @@ export class CommandExecutor {
         return await this.handleYouTubeSearch(input);
       }
 
-      // General help
+      // Email
+      if (lowerInput.includes('email') || lowerInput.includes('mail') || lowerInput.includes('send')) {
+        return await this.handleEmailDraft(input);
+      }
+
+      // Help
       if (lowerInput.includes('help') || lowerInput.includes('what can you do')) {
         return this.getHelpResponse();
       }
 
-      // Default response
-      const result = {
-        success: true,
-        message: `I understand you want to "${input}". I can help you open apps, search the web, send emails, and more. Try saying "open Chrome" or "search for something".`
-      };
-      this.addToHistory(input, true, result.message);
-      return result;
-
+      // Fallback
+      this.addToHistory(input, false, 'Unknown command');
+      this.log('Unknown command', { input });
+      return { success: false, message: 'Sorry, I did not understand that command.' };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('Command execution error:', errorMessage);
-      const result = {
-        success: false,
-        message: 'Sorry, I encountered an error while processing your request.',
-        error: errorMessage
-      };
-      this.addToHistory(input, false, errorMessage);
-      return result;
+      this.addToHistory(input, false, String(error));
+      this.log('Command execution error', { input, error });
+      return { success: false, message: 'An error occurred while processing your command.', error: String(error) };
     }
   }
 
   private async handleAppLaunch(input: string): Promise<CommandResult> {
     const lowerInput = input.toLowerCase();
-    
-    // Find matching app
-    const app = this.appConfigs.find(config => 
+    const app = this.appConfigs.find(config =>
       config.aliases.some(alias => lowerInput.includes(alias)) ||
       lowerInput.includes(config.name)
     );
-
     if (!app) {
-      return {
-        success: false,
-        message: 'I couldn\'t find that application. Try saying "open Chrome", "launch Notepad", or "start Calculator".'
-      };
+      this.addToHistory(input, false, 'App not found');
+      this.log('App not found', { input });
+      return { success: false, message: 'App not found. Try "Open Chrome" or "Launch Notepad".' };
     }
-
     try {
       if (app.url) {
-        // Web-based app
         await shell.openExternal(app.url);
-        return {
-          success: true,
-          message: `Opening ${app.name} in your browser...`,
-          data: { app: app.name, type: 'web' }
-        };
+        this.addToHistory(input, true, `Opened ${app.name} in browser`);
+        this.log('App opened in browser', { app });
+        return { success: true, message: `Opened ${app.name} in browser.` };
       } else {
-        // Desktop app
         const appPath = this.getAppPath(app);
         if (!appPath) {
-          return {
-            success: false,
-            message: `I couldn't find ${app.name} on your system. Please make sure it's installed.`
-          };
+          this.addToHistory(input, false, `App path not found for ${app.name}`);
+          this.log('App path not found', { app });
+          return { success: false, message: `App path not found for ${app.name}.` };
         }
-
         await this.launchApp(appPath);
-        return {
-          success: true,
-          message: `Launching ${app.name}...`,
-          data: { app: app.name, type: 'desktop', path: appPath }
-        };
+        this.addToHistory(input, true, `Launched ${app.name}`);
+        this.log('App launched', { app });
+        return { success: true, message: `Launched ${app.name}.` };
       }
     } catch (error) {
-      return {
-        success: false,
-        message: `Failed to launch ${app.name}. Please make sure it's installed and accessible.`,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      this.addToHistory(input, false, `Failed to launch ${app.name}: ${error}`);
+      this.log('App launch error', { app, error });
+      return { success: false, message: `Failed to launch ${app.name}.`, error: String(error) };
     }
   }
 
   private getAppPath(app: AppConfig): string | null {
     const platform = os.platform();
-    
     switch (platform) {
       case 'win32':
         return app.windowsPath || null;
@@ -267,16 +284,11 @@ export class CommandExecutor {
 
   private async launchApp(appPath: string): Promise<void> {
     const platform = os.platform();
-    
     if (platform === 'win32') {
-      // Handle Windows path with environment variables
       const expandedPath = appPath.replace(/%USERNAME%/g, os.userInfo().username);
-      
-      // Handle wildcards in path (like Discord app-*)
       if (expandedPath.includes('*')) {
         const basePath = expandedPath.substring(0, expandedPath.lastIndexOf('\\'));
         const pattern = expandedPath.substring(expandedPath.lastIndexOf('\\') + 1);
-        
         if (fs.existsSync(basePath)) {
           const dirs = fs.readdirSync(basePath);
           const matchingDir = dirs.find(dir => dir.startsWith(pattern.replace('*', '')));
@@ -289,12 +301,9 @@ export class CommandExecutor {
           }
         }
       }
-      
-      // Try direct execution
       if (fs.existsSync(expandedPath)) {
         await execAsync(`"${expandedPath}"`);
       } else {
-        // Try just the executable name
         await execAsync(appPath);
       }
     } else if (platform === 'darwin') {
@@ -305,81 +314,54 @@ export class CommandExecutor {
   }
 
   private async handleWebSearch(input: string): Promise<CommandResult> {
-    const searchTerms = input
-      .toLowerCase()
-      .replace(/search|find|google/g, '')
-      .trim();
-    
+    const searchTerms = input.replace(/search|find|google/gi, '').trim();
     if (!searchTerms) {
-      return {
-        success: false,
-        message: 'What would you like me to search for? Try saying "search for React tutorials" or "find information about TypeScript".'
-      };
+      this.addToHistory(input, false, 'No search terms provided');
+      this.log('No search terms', { input });
+      return { success: false, message: 'What would you like me to search for?' };
     }
-
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchTerms)}`;
-    
     try {
       await shell.openExternal(searchUrl);
-      return {
-        success: true,
-        message: `Searching for "${searchTerms}"...`,
-        data: { searchTerms, url: searchUrl }
-      };
+      this.addToHistory(input, true, `Searched for "${searchTerms}"`);
+      this.log('Web search success', { searchTerms });
+      return { success: true, message: `Searched for "${searchTerms}".` };
     } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to open search in browser.',
-        error: error instanceof Error ? error.message : String(error)
-      };
+      this.addToHistory(input, false, `Failed to search: ${error}`);
+      this.log('Web search error', { searchTerms, error });
+      return { success: false, message: 'Failed to open search in browser.', error: String(error) };
     }
   }
 
   private async handleYouTubeSearch(input: string): Promise<CommandResult> {
-    const searchTerms = input
-      .toLowerCase()
-      .replace(/youtube|video|search|find/g, '')
-      .trim();
-    
+    const searchTerms = input.replace(/youtube|video|search|find/gi, '').trim();
     if (!searchTerms) {
-      return {
-        success: false,
-        message: 'What would you like me to search for on YouTube? Try saying "YouTube Logan Paul" or "video React tutorial".'
-      };
+      this.addToHistory(input, false, 'No YouTube search terms');
+      this.log('No YouTube search terms', { input });
+      return { success: false, message: 'What would you like me to search for on YouTube?' };
     }
-
     const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchTerms)}`;
-    
     try {
       await shell.openExternal(searchUrl);
-      return {
-        success: true,
-        message: `Searching YouTube for "${searchTerms}"...`,
-        data: { searchTerms, url: searchUrl }
-      };
+      this.addToHistory(input, true, `YouTube searched for "${searchTerms}"`);
+      this.log('YouTube search success', { searchTerms });
+      return { success: true, message: `Searched YouTube for "${searchTerms}".` };
     } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to open YouTube search.',
-        error: error instanceof Error ? error.message : String(error)
-      };
+      this.addToHistory(input, false, `Failed YouTube search: ${error}`);
+      this.log('YouTube search error', { searchTerms, error });
+      return { success: false, message: 'Failed to open YouTube search.', error: String(error) };
     }
   }
 
   private async handleEmailDraft(input: string): Promise<CommandResult> {
     const lowerInput = input.toLowerCase();
-    
-    // Extract email content from input
     let subject = '';
     let body = '';
     let recipient = '';
-    
-    // Simple parsing for common email patterns
     if (lowerInput.includes('to ')) {
       const toMatch = input.match(/to\s+([^,\s]+)/i);
       if (toMatch) recipient = toMatch[1];
     }
-    
     if (lowerInput.includes('asking for') || lowerInput.includes('requesting')) {
       subject = 'Request';
       body = input.replace(/.*?(asking for|requesting)\s+/i, '');
@@ -390,38 +372,23 @@ export class CommandExecutor {
       subject = 'Email';
       body = input.replace(/.*?(email|mail|send)\s+/i, '');
     }
-
-    // Create mailto URL
     const mailtoUrl = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
     try {
       await shell.openExternal(mailtoUrl);
-      return {
-        success: true,
-        message: `Opening email client${recipient ? ` to ${recipient}` : ''}...`,
-        data: { recipient, subject, body, url: mailtoUrl }
-      };
+      this.addToHistory(input, true, `Opened email client for ${recipient}`);
+      this.log('Email draft success', { recipient, subject, body });
+      return { success: true, message: `Opened email client${recipient ? ` to ${recipient}` : ''}.` };
     } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to open email client. Please make sure you have a default email application configured.',
-        error: error instanceof Error ? error.message : String(error)
-      };
+      this.addToHistory(input, false, `Failed to open email client: ${error}`);
+      this.log('Email draft error', { recipient, subject, body, error });
+      return { success: false, message: 'Failed to open email client. Please make sure you have a default email application configured.', error: String(error) };
     }
   }
 
   private getHelpResponse(): CommandResult {
     return {
       success: true,
-      message: `I'm Doppel, your AI assistant! Here's what I can help you with:
-
-🎯 **App Launch**: "Open Chrome", "Launch Notepad", "Start Calculator"
-🔍 **Web Search**: "Search for React tutorials", "Find TypeScript documentation"
-📧 **Email**: "Send email to manager asking for time off", "Email team about meeting"
-📺 **YouTube**: "YouTube React tutorial", "Video Logan Paul"
-⚙️ **Other**: "Help", "What can you do?"
-
-Just type your request and I'll help you get things done!`,
+      message: `I'm Doppel, your AI assistant!\n\n- Open apps: "Open Chrome"\n- Search: "Search for React"\n- YouTube: "YouTube Logan Paul"\n- Email: "Send email to manager"\n- Multi-step: "Open Chrome and go to gmail.com"\n- Queue: "Open Zoom and then Notion"\n\nJust type your request and I'll help you get things done!`,
       data: { type: 'help' }
     };
   }
@@ -433,45 +400,34 @@ Just type your request and I'll help you get things done!`,
   public getCommandSuggestions(input: string): string[] {
     const lowerInput = input.toLowerCase();
     const suggestions: string[] = [];
-    
-    // App suggestions
     this.appConfigs.forEach(app => {
       if (app.name.includes(lowerInput) || app.aliases.some(alias => alias.includes(lowerInput))) {
         suggestions.push(`Open ${app.name}`);
       }
     });
-    
-    // Common command suggestions
     if (lowerInput.includes('search') || lowerInput.includes('find')) {
       suggestions.push('Search for React tutorials');
       suggestions.push('Find TypeScript documentation');
     }
-    
     if (lowerInput.includes('email') || lowerInput.includes('mail')) {
       suggestions.push('Send email to manager asking for time off');
       suggestions.push('Email team about meeting');
     }
-    
     if (lowerInput.includes('youtube') || lowerInput.includes('video')) {
       suggestions.push('YouTube React tutorial');
       suggestions.push('Video Logan Paul');
     }
-    
     return suggestions.slice(0, 5);
   }
 
   public async executeCommandQueue(commands: string[]): Promise<CommandResult[]> {
     const results: CommandResult[] = [];
-    
     for (const command of commands) {
-      console.log(`🔄 Executing command in queue: "${command}"`);
-      const result = await this.executeCommand(command);
+      this.log('Queue executing', { command });
+      const result = await this.executeSingleCommand(command);
       results.push(result);
-      
-      // Add small delay between commands
       await new Promise(resolve => setTimeout(resolve, 500));
     }
-    
     return results;
   }
 } 

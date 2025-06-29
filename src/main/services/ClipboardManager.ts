@@ -135,7 +135,7 @@ export class ClipboardManager {
           content: row[1],
           type: row[2],
           timestamp: row[3],
-          size: row[4]
+          hash: row[4]
         }));
       }
       return [];
@@ -165,7 +165,7 @@ export class ClipboardManager {
           content: row[1],
           type: row[2],
           timestamp: row[3],
-          size: row[4]
+          hash: row[4]
         }));
       }
       return [];

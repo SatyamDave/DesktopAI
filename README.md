@@ -47,6 +47,37 @@ npm install
 npm run dev
 ```
 
+### Running as Desktop Application
+
+The application is designed to run as a desktop application using Electron. Here are the different ways to run it:
+
+#### Development Mode (Desktop)
+```bash
+# Run both renderer and main process for desktop development
+npm run dev
+```
+
+#### Production Mode (Desktop)
+```bash
+# Build the application first
+npm run build
+
+# Run the desktop application
+npx electron .
+
+# Or use the provided batch file (Windows)
+run-desktop.bat
+```
+
+#### Web Development Mode (Browser)
+If you want to run it in a browser for web development:
+```bash
+# Run only the renderer process (Vite dev server)
+npm run dev:renderer
+```
+
+**Note**: The application is primarily designed as a desktop application. Running it in a browser will limit some features like global shortcuts, system integration, and native desktop capabilities.
+
 ### Usage
 
 1. **Launch Doppel**: The floating orb will appear on your screen

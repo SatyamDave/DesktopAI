@@ -2,7 +2,7 @@
   "name": "doppel",
   "version": "1.0.0",
   "description": "A Smart Floating AI Desktop Assistant",
-  "main": "dist/main.js",
+  "main": "dist/main/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
     "dev:main": "tsc -p tsconfig.main.json && electron .",
