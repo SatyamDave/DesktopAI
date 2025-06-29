@@ -284,7 +284,7 @@ export class AutomationTestSuite {
     // Test 2: Whisper mode status
     const statusTest = await this.runTest('Whisper Mode Status', async () => {
       const status = this.whisperMode.getStatus();
-      return { isActive: status.isActive, isInitialized: status.isInitialized };
+      return { isActive: status.isActive, isRecording: status.isRecording };
     });
     tests.push(statusTest);
 
