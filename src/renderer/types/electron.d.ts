@@ -17,6 +17,32 @@ declare global {
       }>;
       toggleWhisperMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
       getAppStatus: () => Promise<{ success: boolean; status?: any; error?: string }>;
+      // Performance monitoring methods
+      getPerformanceMetrics: () => Promise<{ 
+        success: boolean; 
+        metrics?: any; 
+        systemInfo?: any; 
+        dbStats?: any; 
+        clipboardStats?: any; 
+        behaviorStats?: any; 
+        error?: string 
+      }>;
+      optimizePerformance: (mode: 'low' | 'high') => Promise<{ success: boolean; mode?: string; error?: string }>;
+      getPerformanceHistory: () => Promise<{ success: boolean; metrics?: any[]; error?: string }>;
+      // Emergency mode methods
+      getEmergencyStatus: () => Promise<{ 
+        success: boolean; 
+        status?: {
+          isEmergencyMode: boolean;
+          currentMemory: number;
+          currentCpu: number;
+          currentDiskIO: number;
+        }; 
+        error?: string 
+      }>;
+      forceEmergencyMode: () => Promise<{ success: boolean; error?: string }>;
+      // Listen for emergency mode events
+      onEmergencyMode: (callback: (isEmergency: boolean) => void) => void;
     };
   }
 }

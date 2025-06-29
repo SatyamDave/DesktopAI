@@ -70,12 +70,14 @@ export class WhisperMode {
     if (this.isActive) return;
     this.isActive = true;
     this.registerHotkeys();
+    console.log('Whisper mode enabled (performance optimized)');
   }
 
   public stop() {
     this.isActive = false;
     this.unregisterHotkeys();
     this.stopRecording();
+    console.log('Whisper mode disabled');
   }
 
   private registerHotkeys() {

@@ -6,9 +6,15 @@ interface CommandInputProps {
   onClose: () => void;
   isListening?: boolean;
   setIsListening?: (listening: boolean) => void;
+  performanceMode?: boolean;
 }
 
-const CommandInput: React.FC<CommandInputProps> = ({ onClose, isListening = false, setIsListening }) => {
+const CommandInput: React.FC<CommandInputProps> = ({ 
+  onClose, 
+  isListening = false, 
+  setIsListening,
+  performanceMode = false 
+}) => {
   const [input, setInput] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -22,27 +28,36 @@ const CommandInput: React.FC<CommandInputProps> = ({ onClose, isListening = fals
     inputRef.current?.focus();
   }, []);
 
-  // Handle keyboard shortcuts
+  // Handle keyboard shortcuts with debouncing for performance mode
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-      if (e.ctrlKey && e.shiftKey && e.key === 'W') {
-        e.preventDefault();
-        setIsListening?.(!isListening);
-      }
+      clearTimeout(timeoutId);
+      
+      timeoutId = setTimeout(() => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+        if (e.ctrlKey && e.shiftKey && e.key === 'W') {
+          e.preventDefault();
+          setIsListening?.(!isListening);
+        }
+      }, performanceMode ? 100 : 50);
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, isListening, setIsListening]);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(timeoutId);
+    };
+  }, [onClose, isListening, setIsListening, performanceMode]);
 
-  // Load command history
+  // Load command history with reduced frequency in performance mode
   useEffect(() => {
     const loadHistory = async () => {
       try {
-        const response = await window.electronAPI?.getCommandHistory(10);
+        const response = await window.electronAPI?.getCommandHistory(performanceMode ? 5 : 10);
         if (response?.success) {
           setCommandHistory(response.history || []);
         }
@@ -51,12 +66,12 @@ const CommandInput: React.FC<CommandInputProps> = ({ onClose, isListening = fals
       }
     };
     loadHistory();
-  }, []);
+  }, [performanceMode]);
 
-  // Get suggestions as user types
+  // Get suggestions as user types with increased debounce in performance mode
   useEffect(() => {
     const getSuggestions = async () => {
-      if (input.trim().length > 2) {
+      if (input.trim().length > (performanceMode ? 3 : 2)) {
         try {
           const response = await window.electronAPI?.getCommandSuggestions(input);
           if (response?.success) {
@@ -70,9 +85,9 @@ const CommandInput: React.FC<CommandInputProps> = ({ onClose, isListening = fals
       }
     };
 
-    const timeoutId = setTimeout(getSuggestions, 300);
+    const timeoutId = setTimeout(getSuggestions, performanceMode ? 500 : 300);
     return () => clearTimeout(timeoutId);
-  }, [input]);
+  }, [input, performanceMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

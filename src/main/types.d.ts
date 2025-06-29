@@ -27,4 +27,5 @@ declare module 'node-global-key-listener' {
   }
 }
 
-declare module 'sql.js'; 
+declare module 'sql.js';
+declare module 'node-schedule'; 

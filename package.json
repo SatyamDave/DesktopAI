@@ -13,7 +13,12 @@
     "dist": "electron-builder",
     "postinstall": "electron-builder install-app-deps",
     "type-check": "tsc --noEmit",
-    "lint": "echo 'No linter configured yet'"
+    "lint": "echo 'No linter configured yet'",
+    "test:performance": "node test-performance.js",
+    "dev:debug": "npm run dev",
+    "dev:performance": "npm run dev -- --enable-logging --remote-debugging-port=9222",
+    "start:laptop-safe": "npm run dev",
+    "start:emergency": "npm run dev -- --emergency-mode"
   },
   "keywords": [
     "ai",

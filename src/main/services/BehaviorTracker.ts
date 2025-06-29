@@ -1,8 +1,7 @@
-import * as schedule from 'node-schedule';
-import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
 import * as path from 'path';
 import * as os from 'os';
-import * as fs from 'fs';
+import { DatabaseManager } from './DatabaseManager';
+import { PerformanceOptimizer } from './PerformanceOptimizer';
 
 interface BehaviorEvent {
   id: number;
@@ -28,37 +27,47 @@ interface TimeBasedStats {
 }
 
 export class BehaviorTracker {
-  private db: Database | null = null;
-  private sqlJS: SqlJsStatic | null = null;
-  private dbPath: string;
+  private databaseManager: DatabaseManager;
+  private performanceOptimizer: PerformanceOptimizer;
   private isTracking = false;
   private currentApp = '';
   private currentWindow = '';
   private lastEventTime = 0;
   private trackingInterval: NodeJS.Timeout | null = null;
+  private dbName = 'behavior';
 
   constructor() {
-    const dbDir = path.join(os.homedir(), '.doppel');
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
-    }
-    this.dbPath = path.join(dbDir, 'behavior.sqlite');
+    this.databaseManager = DatabaseManager.getInstance();
+    this.performanceOptimizer = PerformanceOptimizer.getInstance();
+    
+    // Register database with optimized settings
+    this.databaseManager.registerDatabase({
+      name: this.dbName,
+      filePath: path.join(os.homedir(), '.doppel', 'behavior.sqlite'),
+      autoSave: true,
+      saveInterval: 120000, // 120 seconds (was 60 seconds)
+      maxConnections: 1
+    });
+    
+    // Setup performance throttling with longer intervals
+    this.performanceOptimizer.createThrottleConfig('behavior', 60000, 300000, 2.0);
   }
 
   public async init() {
-    this.sqlJS = await initSqlJs();
-    if (fs.existsSync(this.dbPath)) {
-      const filebuffer = fs.readFileSync(this.dbPath);
-      this.db = new this.sqlJS.Database(filebuffer);
-    } else {
-      this.db = new this.sqlJS.Database();
-      this.initializeDatabase();
-      this.saveToDisk();
+    try {
+      await this.databaseManager.initialize();
+      await this.initializeDatabase();
+      console.log('✅ BehaviorTracker initialized with performance optimizations');
+    } catch (error) {
+      console.error('❌ Error initializing BehaviorTracker:', error);
+      throw error;
     }
   }
 
-  private initializeDatabase() {
-    this.db!.run(`
+  private async initializeDatabase() {
+    const db = await this.databaseManager.getDatabase(this.dbName);
+    
+    db.run(`
       CREATE TABLE IF NOT EXISTS behavior_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_type TEXT NOT NULL,
@@ -79,18 +88,13 @@ export class BehaviorTracker {
     `);
   }
 
-  private saveToDisk() {
-    if (this.db) {
-      const data = this.db.export();
-      fs.writeFileSync(this.dbPath, Buffer.from(data));
-    }
-  }
-
   public async start() {
-    if (!this.db) await this.init();
-    this.isTracking = true;
-    this.trackingInterval = setInterval(() => this.trackBehavior(), 5000);
-    console.log('Behavior tracking started');
+    if (!this.isTracking) {
+      this.isTracking = true;
+      const interval = this.performanceOptimizer.getThrottledInterval('behavior');
+      this.trackingInterval = setInterval(() => this.trackBehavior(), interval);
+      console.log(`📊 Behavior tracking started (interval: ${interval}ms)`);
+    }
   }
 
   public stop() {
@@ -99,27 +103,49 @@ export class BehaviorTracker {
       clearInterval(this.trackingInterval);
       this.trackingInterval = null;
     }
-    console.log('Behavior tracking stopped');
+    console.log('📊 Behavior tracking stopped');
   }
 
   private async trackBehavior() {
     if (!this.isTracking) return;
     
-    await this.checkActiveApplication();
-    this.cleanupOldData();
+    const now = Date.now();
+    const minInterval = 25000; // Minimum 25 seconds between events
+    
+    if (now - this.lastEventTime < minInterval) {
+      return;
+    }
+    
+    try {
+      await this.checkActiveApplication();
+      
+      // Periodic cleanup (10% chance)
+      if (Math.random() < 0.1) {
+        await this.cleanupOldData();
+      }
+      
+      // Adjust throttle based on activity
+      this.performanceOptimizer.decreaseThrottle('behavior');
+    } catch (error) {
+      console.error('❌ Error in behavior tracking:', error);
+      // Increase throttle on error to reduce load
+      this.performanceOptimizer.increaseThrottle('behavior');
+    }
   }
 
   private async checkActiveApplication() {
-    // Simulate app switching for demo
-    const apps = ['Chrome', 'VS Code', 'Terminal', 'Spotify', 'Discord'];
-    const randomApp = apps[Math.floor(Math.random() * apps.length)];
-    const oldApp = this.currentApp;
-    
-    this.currentApp = randomApp;
-    if (oldApp) {
-      await this.recordAppSwitch(oldApp, randomApp);
+    // Simulate app switching with reduced frequency
+    if (Math.random() < 0.2) { // 20% chance instead of 30%
+      const apps = ['Chrome', 'VS Code', 'Terminal', 'Spotify', 'Discord'];
+      const randomApp = apps[Math.floor(Math.random() * apps.length)];
+      const oldApp = this.currentApp;
+      
+      this.currentApp = randomApp;
+      if (oldApp && oldApp !== randomApp) {
+        await this.recordAppSwitch(oldApp, randomApp);
+      }
+      await this.updateAppUsage(randomApp);
     }
-    await this.updateAppUsage(randomApp);
   }
 
   private async recordAppSwitch(fromApp: string, toApp: string) {
@@ -132,33 +158,48 @@ export class BehaviorTracker {
       duration: 0,
       metadata: JSON.stringify({ from: fromApp, to: toApp })
     };
-    this.saveEvent(event);
+    
+    await this.saveEvent(event);
   }
 
   private async updateAppUsage(appName: string) {
     const now = Date.now();
-    // Upsert logic for sql.js
-    const res = this.db!.exec('SELECT * FROM app_usage WHERE app_name = ?', [appName]);
-    if (res[0] && res[0].values && res[0].values.length > 0) {
-      this.db!.run(
-        'UPDATE app_usage SET last_used = ?, usage_count = usage_count + 1 WHERE app_name = ?',
-        [now, appName]
+    
+    try {
+      const result = await this.databaseManager.executeQuery(
+        this.dbName,
+        'SELECT * FROM app_usage WHERE app_name = ?',
+        [appName]
       );
-    } else {
-      this.db!.run(
-        'INSERT INTO app_usage (app_name, total_time, last_used, usage_count) VALUES (?, 0, ?, 1)',
-        [appName, now]
-      );
+      
+      if (result[0] && result[0].values && result[0].values.length > 0) {
+        await this.databaseManager.batchExecute(
+          this.dbName,
+          'UPDATE app_usage SET last_used = ?, usage_count = usage_count + 1 WHERE app_name = ?',
+          [now, appName]
+        );
+      } else {
+        await this.databaseManager.batchExecute(
+          this.dbName,
+          'INSERT INTO app_usage (app_name, total_time, last_used, usage_count) VALUES (?, 0, ?, 1)',
+          [appName, now]
+        );
+      }
+    } catch (error) {
+      console.error('❌ Error updating app usage:', error);
     }
-    this.saveToDisk();
   }
 
-  private saveEvent(event: BehaviorEvent) {
-    this.db!.run(
-      'INSERT INTO behavior_events (event_type, app_name, window_title, timestamp, duration, metadata) VALUES (?, ?, ?, ?, ?, ?)',
-      [event.event_type, event.app_name, event.window_title, event.timestamp, event.duration, event.metadata]
-    );
-    this.saveToDisk();
+  private async saveEvent(event: BehaviorEvent) {
+    try {
+      await this.databaseManager.batchExecute(
+        this.dbName,
+        'INSERT INTO behavior_events (event_type, app_name, window_title, timestamp, duration, metadata) VALUES (?, ?, ?, ?, ?, ?)',
+        [event.event_type, event.app_name, event.window_title, event.timestamp, event.duration, event.metadata]
+      );
+    } catch (error) {
+      console.error('❌ Error saving behavior event:', error);
+    }
   }
 
   public async recordEvent(eventType: string, data: string, appName?: string) {
@@ -171,15 +212,20 @@ export class BehaviorTracker {
       duration: 0,
       metadata: data
     };
-    this.saveEvent(event);
+    
+    await this.saveEvent(event);
   }
 
   public async getRecentEvents(limit = 20): Promise<BehaviorEvent[]> {
-    if (!this.db) await this.init();
     try {
-      const res = this.db!.exec('SELECT * FROM behavior_events ORDER BY timestamp DESC LIMIT ?', [limit]);
-      if (res[0] && res[0].values) {
-        return res[0].values.map((row: any[]) => ({
+      const result = await this.databaseManager.executeQuery(
+        this.dbName,
+        'SELECT * FROM behavior_events ORDER BY timestamp DESC LIMIT ?',
+        [limit]
+      );
+      
+      if (result[0] && result[0].values) {
+        return result[0].values.map((row: any[]) => ({
           id: row[0],
           event_type: row[1],
           app_name: row[2],
@@ -191,17 +237,21 @@ export class BehaviorTracker {
       }
       return [];
     } catch (error) {
-      console.error('Error getting recent events:', error);
+      console.error('❌ Error getting recent events:', error);
       return [];
     }
   }
 
   public async getAppUsageStats(limit = 10): Promise<AppUsage[]> {
-    if (!this.db) await this.init();
     try {
-      const res = this.db!.exec('SELECT app_name, SUM(duration) as total_duration, COUNT(*) as sessions FROM behavior_events WHERE event_type = "app_switch" GROUP BY app_name ORDER BY total_duration DESC LIMIT ?', [limit]);
-      if (res[0] && res[0].values) {
-        return res[0].values.map((row: any[]) => ({
+      const result = await this.databaseManager.executeQuery(
+        this.dbName,
+        'SELECT app_name, total_time, usage_count FROM app_usage ORDER BY last_used DESC LIMIT ?',
+        [limit]
+      );
+      
+      if (result[0] && result[0].values) {
+        return result[0].values.map((row: any[]) => ({
           app_name: row[0],
           total_duration: row[1],
           sessions: row[2]
@@ -209,139 +259,106 @@ export class BehaviorTracker {
       }
       return [];
     } catch (error) {
-      console.error('Error getting app usage stats:', error);
+      console.error('❌ Error getting app usage stats:', error);
       return [];
     }
   }
 
   public async getTimeBasedStats(): Promise<TimeBasedStats> {
-    if (!this.db) await this.init();
     try {
-      const res = this.db!.exec('SELECT event_type, COUNT(*) as count FROM behavior_events WHERE timestamp > ? GROUP BY event_type', [Date.now() - 24 * 60 * 60 * 1000]);
-      if (res[0] && res[0].values) {
-        const stats = res[0].values.reduce((acc: any, row: any[]) => {
-          acc[row[0]] = row[1];
-          return acc;
-        }, {});
-        return {
-          appSwitches: stats.app_switch || 0,
-          windowChanges: stats.window_change || 0,
-          idleTime: stats.idle || 0,
-          activeTime: stats.active || 0
-        };
+      const now = Date.now();
+      const oneDayAgo = now - (24 * 60 * 60 * 1000);
+      
+      const result = await this.databaseManager.executeQuery(
+        this.dbName,
+        'SELECT event_type, COUNT(*) as count FROM behavior_events WHERE timestamp > ? GROUP BY event_type',
+        [oneDayAgo]
+      );
+      
+      const stats: TimeBasedStats = {
+        appSwitches: 0,
+        windowChanges: 0,
+        idleTime: 0,
+        activeTime: 0
+      };
+      
+      if (result[0] && result[0].values) {
+        for (const row of result[0].values) {
+          const eventType = row[0];
+          const count = row[1];
+          
+          switch (eventType) {
+            case 'app_switch':
+              stats.appSwitches = count;
+              break;
+            case 'window_change':
+              stats.windowChanges = count;
+              break;
+            case 'idle':
+              stats.idleTime = count;
+              break;
+            case 'active':
+              stats.activeTime = count;
+              break;
+          }
+        }
       }
-      return { appSwitches: 0, windowChanges: 0, idleTime: 0, activeTime: 0 };
+      
+      return stats;
     } catch (error) {
-      console.error('Error getting time-based stats:', error);
-      return { appSwitches: 0, windowChanges: 0, idleTime: 0, activeTime: 0 };
+      console.error('❌ Error getting time-based stats:', error);
+      return {
+        appSwitches: 0,
+        windowChanges: 0,
+        idleTime: 0,
+        activeTime: 0
+      };
     }
   }
 
   public async getProductivityScore(): Promise<number> {
-    if (!this.db) await this.init();
     try {
-      const res = this.db!.exec('SELECT SUM(duration) as total_active FROM behavior_events WHERE event_type = "active" AND timestamp > ?', [Date.now() - 24 * 60 * 60 * 1000]);
-      if (res[0] && res[0].values && res[0].values[0]) {
-        const totalActive = res[0].values[0][0] || 0;
-        const totalTime = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-        return Math.round((totalActive / totalTime) * 100);
-      }
-      return 0;
+      const stats = await this.getTimeBasedStats();
+      const totalEvents = stats.appSwitches + stats.windowChanges;
+      
+      if (totalEvents === 0) return 0;
+      
+      // Simple productivity calculation
+      const productivityScore = Math.min(100, (stats.activeTime / totalEvents) * 100);
+      return Math.round(productivityScore);
     } catch (error) {
-      console.error('Error calculating productivity score:', error);
+      console.error('❌ Error calculating productivity score:', error);
       return 0;
     }
   }
 
-  private cleanupOldData() {
-    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-    this.db!.run('DELETE FROM behavior_events WHERE timestamp < ?', [thirtyDaysAgo]);
-    this.saveToDisk();
-  }
-
-  public async exportData(): Promise<any> {
-    const events = await this.getRecentEvents(1000);
-    const usage = await this.getAppUsageStats();
-    const patterns = await this.getBehaviorPatterns();
-    return {
-      events,
-      usage,
-      patterns,
-      exportDate: new Date().toISOString()
-    };
-  }
-
-  private trackAppSwitch(appName: string, windowTitle: string) {
-    const event: BehaviorEvent = {
-      id: 0,
-      event_type: 'app_switch',
-      app_name: appName,
-      window_title: windowTitle,
-      timestamp: Date.now(),
-      duration: 0,
-      metadata: JSON.stringify({ action: 'switch' })
-    };
-    this.saveEvent(event);
-  }
-
-  private trackWindowChange(windowTitle: string) {
-    const event: BehaviorEvent = {
-      id: 0,
-      event_type: 'window_change',
-      app_name: this.currentApp || 'Unknown',
-      window_title: windowTitle,
-      timestamp: Date.now(),
-      duration: 0,
-      metadata: JSON.stringify({ action: 'change' })
-    };
-    this.saveEvent(event);
-  }
-
-  private trackIdleTime(duration: number) {
-    const event: BehaviorEvent = {
-      id: 0,
-      event_type: 'idle',
-      app_name: this.currentApp || 'Unknown',
-      window_title: this.currentWindow || 'Unknown',
-      timestamp: Date.now(),
-      duration,
-      metadata: JSON.stringify({ action: 'idle' })
-    };
-    this.saveEvent(event);
-  }
-
-  private trackActiveTime(duration: number) {
-    const event: BehaviorEvent = {
-      id: 0,
-      event_type: 'active',
-      app_name: this.currentApp || 'Unknown',
-      window_title: this.currentWindow || 'Unknown',
-      timestamp: Date.now(),
-      duration,
-      metadata: JSON.stringify({ action: 'active' })
-    };
-    this.saveEvent(event);
-  }
-
-  public async getBehaviorPatterns(): Promise<any[]> {
-    if (!this.db) await this.init();
+  private async cleanupOldData() {
     try {
-      const weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-      const res = this.db!.exec(
-        'SELECT app_name, COUNT(*) as event_count, MAX(timestamp) as last_activity FROM behavior_events WHERE timestamp > ? GROUP BY app_name ORDER BY event_count DESC',
-        [weekAgo]
+      const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      
+      await this.databaseManager.executeQuery(
+        this.dbName,
+        'DELETE FROM behavior_events WHERE timestamp < ?',
+        [thirtyDaysAgo]
       );
-      if (res[0] && res[0].values) {
-        return res[0].values.map((row: any[]) => ({
-          app_name: row[0],
-          event_count: row[1],
-          last_activity: row[2]
-        }));
-      }
-      return [];
+      
+      console.debug('🧹 Cleaned up old behavior data');
     } catch (error) {
-      console.error('Error getting behavior patterns:', error);
-      return [];
+      console.error('❌ Error cleaning up old data:', error);
     }
+  }
+
+  public getPerformanceStats(): {
+    isTracking: boolean;
+    currentApp: string;
+    throttleInterval: number;
+    lastEventTime: number;
+  } {
+    return {
+      isTracking: this.isTracking,
+      currentApp: this.currentApp,
+      throttleInterval: this.performanceOptimizer.getThrottledInterval('behavior'),
+      lastEventTime: this.lastEventTime
+    };
   }
 } 

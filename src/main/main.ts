@@ -15,6 +15,9 @@ import { BehaviorTracker } from './services/BehaviorTracker';
 import { AIProcessor } from './services/AIProcessor';
 import { WhisperMode } from './services/WhisperMode';
 import { CommandExecutor } from './services/CommandExecutor';
+import { ConfigManager } from './services/ConfigManager';
+import { PerformanceOptimizer } from './services/PerformanceOptimizer';
+import { DatabaseManager } from './services/DatabaseManager';
 
 class DoppelApp {
   private mainWindow: BrowserWindow | null = null;
@@ -25,9 +28,20 @@ class DoppelApp {
   private aiProcessor: AIProcessor;
   private whisperMode: WhisperMode;
   private commandExecutor: CommandExecutor;
+  private performanceOptimizer: PerformanceOptimizer;
+  private databaseManager: DatabaseManager;
   private isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
+  // Lazy initialization methods
+  private databaseInitialized = false;
+  private clipboardInitialized = false;
+  private behaviorInitialized = false;
+  private whisperInitialized = false;
+  private aiProcessorInitialized = false;
+
   constructor() {
+    this.performanceOptimizer = PerformanceOptimizer.getInstance();
+    this.databaseManager = DatabaseManager.getInstance();
     this.clipboardManager = new ClipboardManager();
     this.behaviorTracker = new BehaviorTracker();
     this.aiProcessor = new AIProcessor();
@@ -41,41 +55,260 @@ class DoppelApp {
   }
 
   private async initializeApp() {
+    console.log('🚀 Starting DoppelApp initialization...');
+    
     app.whenReady().then(async () => {
+      console.log('✅ Electron app is ready');
       await this.initializeServices();
+      console.log('✅ Services initialized');
       this.createTray();
+      console.log('✅ Tray created');
       this.createFloatingWindow();
+      console.log('✅ Floating window created');
       this.setupGlobalShortcuts();
+      console.log('✅ Global shortcuts setup');
       this.setupIPC();
+      console.log('✅ IPC setup complete');
+      this.setupPerformanceMonitoring();
+      console.log('✅ Performance monitoring setup');
+      console.log('🎉 App initialization complete!');
     });
 
     app.on('window-all-closed', () => {
+      console.log('🔄 All windows closed');
       if (process.platform !== 'darwin') {
         app.quit();
       }
     });
 
     app.on('activate', () => {
+      console.log('🔄 App activated');
       if (BrowserWindow.getAllWindows().length === 0) {
         this.createFloatingWindow();
       }
+    });
+
+    // Cleanup on app quit
+    app.on('before-quit', async () => {
+      console.log('🛑 App quitting, starting cleanup...');
+      await this.cleanup();
     });
   }
 
   private async initializeServices() {
     try {
-      await this.clipboardManager.init();
-      await this.behaviorTracker.init();
-      await this.aiProcessor.init();
-      await this.whisperMode.init();
+      console.log('🚀 Initializing services in ULTRA-LIGHTWEIGHT mode...');
       
-      this.clipboardManager.start();
-      this.behaviorTracker.start();
-      this.whisperMode.start();
+      // Check for ultra-lightweight mode environment variables
+      const isUltraLightweight = process.env.ULTRA_LIGHTWEIGHT === 'true';
+      const disableClipboard = process.env.DISABLE_CLIPBOARD_TRACKING === 'true';
+      const disableBehavior = process.env.DISABLE_BEHAVIOR_TRACKING === 'true';
+      const disableWhisper = process.env.DISABLE_WHISPER_MODE === 'true';
+      const disableAI = process.env.DISABLE_AI_PROCESSING === 'true';
+      const disablePerformanceMonitoring = process.env.DISABLE_PERFORMANCE_MONITORING === 'true';
+      const disableDatabase = process.env.DISABLE_DATABASE === 'true';
       
-      console.log('✅ All services initialized successfully');
+      if (isUltraLightweight) {
+        console.log('⚡ ULTRA-LIGHTWEIGHT MODE DETECTED - Disabling all heavy services');
+        console.log('📋 Clipboard tracking: DISABLED');
+        console.log('👁️ Behavior tracking: DISABLED');
+        console.log('🎤 Whisper mode: DISABLED');
+        console.log('🤖 AI processing: DISABLED');
+        if (disablePerformanceMonitoring) {
+          console.log('🔍 Performance monitoring: DISABLED');
+        }
+        if (disableDatabase) {
+          console.log('🗄️ Database: DISABLED');
+        }
+      }
+      
+      // Initialize performance monitoring with very long interval
+      const monitoringInterval = parseInt(process.env.PERFORMANCE_MONITORING_INTERVAL || '60000');
+      console.log(`🔍 Starting performance monitoring (interval: ${monitoringInterval}ms)...`);
+      
+      // Skip performance monitoring in ultra-lightweight mode to prevent lag
+      if (!isUltraLightweight && !disablePerformanceMonitoring) {
+        this.performanceOptimizer.startMonitoring(monitoringInterval);
+      } else {
+        console.log('⚡ Ultra-lightweight mode: Performance monitoring disabled');
+      }
+      
+      // Initialize database manager only when needed
+      if (!disableDatabase) {
+        console.log('🗄️ Database manager will be initialized on-demand...');
+      } else {
+        console.log('🗄️ Database manager: DISABLED');
+      }
+      
+      // Initialize only the most essential services
+      console.log('🤖 Initializing only essential services...');
+      
+      // Don't initialize heavy services at startup - they'll be initialized on-demand
+      console.log('⚡ ULTRA-LIGHTWEIGHT MODE: Skipping all heavy services at startup');
+      console.log('📋 Clipboard manager: Will initialize on first use');
+      console.log('👁️ Behavior tracker: Will initialize on first use');
+      console.log('🎤 Whisper mode: Will initialize on first use');
+      
+      console.log('✅ Services initialized in ultra-lightweight mode');
     } catch (error) {
       console.error('❌ Error initializing services:', error);
+      // Continue running even if some services fail
+    }
+  }
+
+  private async ensureDatabaseInitialized(): Promise<void> {
+    if (process.env.DISABLE_DATABASE === 'true') {
+      console.log('🗄️ Database disabled by environment variable');
+      return;
+    }
+    
+    if (!this.databaseInitialized) {
+      console.log('🗄️ Initializing database manager on-demand...');
+      await this.databaseManager.initialize();
+      this.databaseInitialized = true;
+    }
+  }
+
+  private async ensureClipboardManagerInitialized(): Promise<void> {
+    if (process.env.DISABLE_CLIPBOARD_TRACKING === 'true') {
+      console.log('📋 Clipboard manager disabled by environment variable');
+      return;
+    }
+    
+    if (!this.clipboardInitialized) {
+      console.log('📋 Initializing clipboard manager on-demand...');
+      await this.ensureDatabaseInitialized();
+      await this.clipboardManager.init();
+      this.clipboardInitialized = true;
+    }
+  }
+
+  private async ensureBehaviorTrackerInitialized(): Promise<void> {
+    if (process.env.DISABLE_BEHAVIOR_TRACKING === 'true') {
+      console.log('👁️ Behavior tracker disabled by environment variable');
+      return;
+    }
+    
+    if (!this.behaviorInitialized) {
+      console.log('👁️ Initializing behavior tracker on-demand...');
+      await this.ensureDatabaseInitialized();
+      await this.behaviorTracker.init();
+      this.behaviorInitialized = true;
+    }
+  }
+
+  private async ensureWhisperModeInitialized(): Promise<void> {
+    if (process.env.DISABLE_WHISPER_MODE === 'true') {
+      console.log('🎤 Whisper mode disabled by environment variable');
+      return;
+    }
+    
+    if (!this.whisperInitialized) {
+      console.log('🎤 Initializing whisper mode on-demand...');
+      await this.whisperMode.init();
+      this.whisperInitialized = true;
+    }
+  }
+
+  private async ensureAIProcessorInitialized(): Promise<void> {
+    if (process.env.DISABLE_AI_PROCESSING === 'true') {
+      console.log('🤖 AI processor disabled by environment variable');
+      return;
+    }
+    
+    if (!this.aiProcessorInitialized) {
+      console.log('🤖 Initializing AI processor on-demand...');
+      await this.aiProcessor.init();
+      this.aiProcessorInitialized = true;
+    }
+  }
+
+  private setupPerformanceMonitoring() {
+    // Listen for performance warnings
+    this.performanceOptimizer.on('performance-warning', (data) => {
+      console.warn('⚠️ Performance warning detected:', data.warnings);
+      
+      // Automatically apply low-performance optimizations
+      if (data.metrics.memoryUsage > 600) { // 600MB threshold (was 400MB)
+        this.performanceOptimizer.optimizeForLowPerformance();
+      }
+    });
+
+    // Listen for emergency mode
+    this.performanceOptimizer.on('emergency-mode', () => {
+      console.log('🚨 EMERGENCY MODE: Stopping all heavy services');
+      
+      // Immediately stop heavy services
+      this.clipboardManager.stop();
+      this.behaviorTracker.stop();
+      
+      // Reduce animation complexity
+      if (this.floatingWindow) {
+        this.floatingWindow.webContents.send('emergency-mode', true);
+      }
+    });
+
+    // Listen for emergency mode exit
+    this.performanceOptimizer.on('emergency-mode-exit', () => {
+      console.log('✅ Emergency mode exited: Restarting services gradually');
+      
+      // Gradually restart services
+      setTimeout(() => {
+        this.clipboardManager.start();
+      }, 5000);
+      
+      setTimeout(() => {
+        this.behaviorTracker.start();
+      }, 10000);
+      
+      // Restore normal animations
+      if (this.floatingWindow) {
+        this.floatingWindow.webContents.send('emergency-mode', false);
+      }
+    });
+
+    // Listen for low-performance mode
+    this.performanceOptimizer.on('low-performance-mode', () => {
+      console.log('⚡ Switching to low-performance mode');
+      // Reduce animation complexity, increase intervals, etc.
+    });
+
+    // Listen for high-performance mode
+    this.performanceOptimizer.on('high-performance-mode', () => {
+      console.log('⚡ Switching to high-performance mode');
+      // Restore normal performance settings
+    });
+
+    // Add emergency shutdown handler
+    process.on('SIGINT', () => {
+      console.log('🛑 Received SIGINT, shutting down gracefully...');
+      this.emergencyShutdown();
+    });
+
+    process.on('SIGTERM', () => {
+      console.log('🛑 Received SIGTERM, shutting down gracefully...');
+      this.emergencyShutdown();
+    });
+  }
+
+  private async cleanup() {
+    console.log('🧹 Cleaning up resources...');
+    
+    try {
+      // Stop performance monitoring
+      this.performanceOptimizer.stopMonitoring();
+      
+      // Stop all services
+      this.clipboardManager.stop();
+      this.behaviorTracker.stop();
+      this.whisperMode.stop();
+      
+      // Close all databases
+      await this.databaseManager.closeAll();
+      
+      console.log('✅ Cleanup completed');
+    } catch (error) {
+      console.error('❌ Error during cleanup:', error);
     }
   }
 
@@ -109,91 +342,58 @@ class DoppelApp {
   }
 
   private createFloatingWindow() {
-    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-    
-    this.floatingWindow = new BrowserWindow({
-      width: width,
-      height: height,
-      x: 0,
-      y: 0,
-      frame: false,
-      transparent: true,
-      alwaysOnTop: true,
-      skipTaskbar: true,
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false
-      }
-    });
-
-    // Try different ports for dev server
-    const devUrls = [
-      'http://localhost:3000',  // Vite default port
-      'http://localhost:5173',  // Vite alternative port
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'http://localhost:3003',
-      'http://localhost:3004',
-      'http://localhost:3005'
-    ];
-    
-    const url = this.isDev 
-      ? devUrls[0] // Use 3000 first since that's what Vite is using
-      : `file://${path.join(__dirname, '../renderer/index.html')}`;
-    
-    console.log(`🚀 Loading URL: ${url}`);
-    this.floatingWindow.loadURL(url);
-
-    // Show the window when it's ready
-    this.floatingWindow.once('ready-to-show', () => {
-      console.log('✅ Window ready to show');
-      this.floatingWindow?.show();
-      this.floatingWindow?.focus();
-    });
-
-    // Fallback: show window after a timeout if ready-to-show doesn't fire
-    setTimeout(() => {
-      if (this.floatingWindow && !this.floatingWindow.isVisible()) {
-        console.log('⏰ Fallback: showing window after timeout');
-        this.floatingWindow.show();
-        this.floatingWindow.focus();
-      }
-    }, 3000);
-
-    // Handle load errors
-    this.floatingWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-      console.error(`❌ Failed to load ${validatedURL}: ${errorDescription}`);
+    try {
+      console.log('🪟 Creating floating orb window...');
       
-      // Try next URL if in dev mode
-      if (this.isDev) {
-        const currentIndex = devUrls.indexOf(validatedURL);
-        if (currentIndex < devUrls.length - 1) {
-          const nextUrl = devUrls[currentIndex + 1];
-          console.log(`🔄 Trying next URL: ${nextUrl}`);
-          this.floatingWindow?.loadURL(nextUrl);
+      this.floatingWindow = new BrowserWindow({
+        width: 100,
+        height: 100,
+        x: 100,
+        y: 100,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        show: true,
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false
         }
-      }
-    });
+      });
 
-    // Add load success handler
-    this.floatingWindow.webContents.on('did-finish-load', () => {
-      console.log('✅ Page finished loading');
-    });
+      const url = this.isDev ? 'http://localhost:3000' : `file://${path.join(__dirname, '../renderer/index.html')}`;
+      console.log(`🚀 Loading URL: ${url}`);
+      
+      this.floatingWindow.loadURL(url);
 
-    // Prevent window from being closed
-    this.floatingWindow.on('close', (event) => {
-      event.preventDefault();
-      this.floatingWindow?.hide();
-    });
+      this.floatingWindow.on('ready-to-show', () => {
+        console.log('✅ Orb window ready to show');
+        this.floatingWindow?.focus();
+      });
 
-    // Don't hide on blur - let user interact with it
-    // this.floatingWindow.on('blur', () => {
-    //   this.floatingWindow?.hide();
-    // });
+      this.floatingWindow.webContents.on('did-finish-load', () => {
+        console.log('✅ Orb page finished loading');
+        this.floatingWindow?.show();
+        this.floatingWindow?.focus();
+      });
+
+      this.floatingWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+        console.error(`❌ Failed to load ${validatedURL}: ${errorDescription}`);
+      });
+
+      this.floatingWindow.on('close', (event) => {
+        event.preventDefault();
+        this.floatingWindow?.hide();
+      });
+
+      console.log('✅ Floating orb window created successfully');
+    } catch (error) {
+      console.error('❌ Error creating floating orb window:', error);
+    }
   }
 
   private setupGlobalShortcuts() {
@@ -242,6 +442,7 @@ class DoppelApp {
     ipcMain.handle('process-ai-input', async (event, input: string, context?: any) => {
       try {
         console.log(`🤖 Processing AI input: "${input}"`);
+        await this.ensureAIProcessorInitialized();
         const result = await this.aiProcessor.processInput(input, context);
         return { success: true, result };
       } catch (error) {
@@ -287,6 +488,7 @@ class DoppelApp {
     // Handle clipboard operations
     ipcMain.handle('get-clipboard-history', async () => {
       try {
+        await this.ensureClipboardManagerInitialized();
         return await this.clipboardManager.getHistory();
       } catch (error) {
         console.error('❌ Error getting clipboard history:', error);
@@ -296,6 +498,7 @@ class DoppelApp {
 
     ipcMain.handle('paste-from-history', async (event, index: number) => {
       try {
+        await this.ensureClipboardManagerInitialized();
         return await this.clipboardManager.pasteFromHistory(index);
       } catch (error) {
         console.error('❌ Error pasting from history:', error);
@@ -306,6 +509,7 @@ class DoppelApp {
     // Handle behavior tracking
     ipcMain.handle('get-user-context', async () => {
       try {
+        await this.ensureBehaviorTrackerInitialized();
         const events = await this.behaviorTracker.getRecentEvents(5);
         const usage = await this.behaviorTracker.getAppUsageStats();
         return {
@@ -330,6 +534,7 @@ class DoppelApp {
     // Handle whisper mode
     ipcMain.handle('toggle-whisper-mode', async (event, enabled: boolean) => {
       try {
+        await this.ensureWhisperModeInitialized();
         if (enabled) {
           await this.whisperMode.start();
         } else {
@@ -345,20 +550,127 @@ class DoppelApp {
     // Handle app status
     ipcMain.handle('get-app-status', async () => {
       try {
-        const whisperStatus = this.whisperMode.getStatus();
+        let whisperStatus = { isActive: false };
+        if (this.whisperInitialized) {
+          whisperStatus = this.whisperMode.getStatus();
+        }
+        
         return {
           success: true,
           status: {
-            clipboardManager: true,
-            behaviorTracker: true,
-            aiProcessor: true,
+            clipboardManager: this.clipboardInitialized,
+            behaviorTracker: this.behaviorInitialized,
+            aiProcessor: this.aiProcessorInitialized,
             whisperMode: whisperStatus.isActive,
-            commandExecutor: true
+            commandExecutor: true,
+            databaseManager: this.databaseInitialized
           }
         };
       } catch (error) {
         console.error('❌ Error getting app status:', error);
         return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // Performance monitoring handlers
+    ipcMain.handle('get-performance-metrics', async () => {
+      try {
+        const metrics = this.performanceOptimizer.getCurrentMetrics();
+        const systemInfo = this.performanceOptimizer.getSystemInfo();
+        
+        // Only get database stats if initialized
+        let dbStats: any = null;
+        if (this.databaseInitialized) {
+          dbStats = this.databaseManager.getDatabaseStats();
+        }
+        
+        // Only get service stats if initialized
+        let clipboardStats: any = null;
+        let behaviorStats: any = null;
+        
+        if (this.clipboardInitialized) {
+          clipboardStats = this.clipboardManager.getPerformanceStats();
+        }
+        
+        if (this.behaviorInitialized) {
+          behaviorStats = this.behaviorTracker.getPerformanceStats();
+        }
+        
+        return {
+          success: true,
+          metrics,
+          systemInfo,
+          dbStats,
+          clipboardStats,
+          behaviorStats,
+          serviceStatus: {
+            database: this.databaseInitialized,
+            clipboard: this.clipboardInitialized,
+            behavior: this.behaviorInitialized,
+            whisper: this.whisperInitialized,
+            aiProcessor: this.aiProcessorInitialized
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error getting performance metrics:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('optimize-performance', async (event, mode: 'low' | 'high') => {
+      try {
+        if (mode === 'low') {
+          await this.performanceOptimizer.optimizeForLowPerformance();
+        } else {
+          await this.performanceOptimizer.optimizeForHighPerformance();
+        }
+        return { success: true, mode };
+      } catch (error) {
+        console.error('❌ Error optimizing performance:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('get-performance-history', async () => {
+      try {
+        const metrics = this.performanceOptimizer.getMetrics();
+        return { success: true, metrics };
+      } catch (error) {
+        console.error('❌ Error getting performance history:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // Emergency mode handlers
+    ipcMain.handle('get-emergency-status', async () => {
+      try {
+        const status = this.performanceOptimizer.getEmergencyStatus();
+        return { success: true, status };
+      } catch (error) {
+        console.error('❌ Error getting emergency status:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('force-emergency-mode', async () => {
+      try {
+        await this.performanceOptimizer.optimizeForLowPerformance();
+        return { success: true };
+      } catch (error) {
+        console.error('❌ Error forcing emergency mode:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.on('move-window', (event, x: number, y: number) => {
+      if (this.floatingWindow) {
+        this.floatingWindow.setPosition(Math.round(x), Math.round(y));
+      }
+    });
+
+    ipcMain.on('resize-window', (event, width: number, height: number) => {
+      if (this.floatingWindow) {
+        this.floatingWindow.setSize(Math.round(width), Math.round(height));
       }
     });
   }
@@ -436,6 +748,37 @@ class DoppelApp {
     } else {
       this.mainWindow.show();
       this.mainWindow.focus();
+    }
+  }
+
+  private async emergencyShutdown() {
+    console.log('🚨 EMERGENCY SHUTDOWN INITIATED');
+    
+    try {
+      // Stop performance monitoring immediately
+      this.performanceOptimizer.stopMonitoring();
+      
+      // Stop all services
+      this.clipboardManager.stop();
+      this.behaviorTracker.stop();
+      this.whisperMode.stop();
+      
+      // Close all databases
+      await this.databaseManager.closeAll();
+      
+      // Close all windows
+      if (this.floatingWindow) {
+        this.floatingWindow.destroy();
+      }
+      if (this.mainWindow) {
+        this.mainWindow.destroy();
+      }
+      
+      console.log('✅ Emergency shutdown completed');
+      process.exit(0);
+    } catch (error) {
+      console.error('❌ Error during emergency shutdown:', error);
+      process.exit(1);
     }
   }
 }

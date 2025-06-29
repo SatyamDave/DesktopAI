@@ -32,6 +32,9 @@ interface AppConfig {
   autoSaveInterval: number;
   whisperModeEnabled: boolean;
   globalShortcutsEnabled: boolean;
+  performanceMode: boolean;
+  behaviorTrackingEnabled: boolean;
+  clipboardTrackingEnabled: boolean;
 }
 
 export class ConfigManager {
@@ -63,7 +66,10 @@ export class ConfigManager {
       maxCommandHistory: 50,
       autoSaveInterval: 30000, // 30 seconds
       whisperModeEnabled: true,
-      globalShortcutsEnabled: true
+      globalShortcutsEnabled: true,
+      performanceMode: false,
+      behaviorTrackingEnabled: false,
+      clipboardTrackingEnabled: false
     };
 
     this.loadConfiguration();
