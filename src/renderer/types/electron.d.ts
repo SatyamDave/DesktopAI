@@ -43,6 +43,7 @@ declare global {
       forceEmergencyMode: () => Promise<{ success: boolean; error?: string }>;
       // Listen for emergency mode events
       onEmergencyMode: (callback: (isEmergency: boolean) => void) => void;
+      getEmailDraftHistory: (limit?: number) => Promise<{ success: boolean; history?: any[]; error?: string }>;
     };
   }
 }

@@ -331,105 +331,97 @@ export class CommandExecutor {
   }
 
   private async executeSingleCommand(input: string): Promise<CommandResult> {
-    const lowerInput = input.toLowerCase().trim();
+    const lowerInput = input.toLowerCase();
+    
     try {
-      // Browser automation: "search X in Chrome", "open Y in Firefox"
-      const browserMatch = lowerInput.match(/(search|open) (.+?) (in|on) (chrome|firefox|edge|brave|opera)/i);
-      if (browserMatch) {
-        const action = browserMatch[1];
-        const target = browserMatch[2];
-        const browser = browserMatch[4];
-        return await this.handleBrowserAutomation(action, target, browser, input);
+      // Check for sequential commands
+      if (lowerInput.includes(' and then ') || lowerInput.includes(' then ')) {
+        const commands = input.split(/\s+(?:and\s+)?then\s+/i);
+        const results = await this.executeCommandQueue(commands);
+        const successCount = results.filter(r => r.success).length;
+        return {
+          success: successCount === results.length,
+          message: `Executed ${successCount}/${results.length} commands successfully.`,
+          data: results
+        };
       }
 
-      // File operations
-      if (lowerInput.includes('file') || lowerInput.includes('folder') || lowerInput.includes('directory')) {
-        return await this.handleFileOperations(input);
-      }
-
-      // System controls
-      if (lowerInput.includes('volume') || lowerInput.includes('brightness') || lowerInput.includes('lock') || 
-          lowerInput.includes('sleep') || lowerInput.includes('shutdown') || lowerInput.includes('restart')) {
-        return await this.handleSystemControls(input);
-      }
-
-      // Clipboard operations
-      if (lowerInput.includes('clipboard') || lowerInput.includes('copy') || lowerInput.includes('paste')) {
-        return await this.handleClipboardOperations(input);
-      }
-
-      // Network operations
-      if (lowerInput.includes('ping') || lowerInput.includes('internet') || lowerInput.includes('network') || 
-          lowerInput.includes('download') || lowerInput.includes('upload')) {
-        return await this.handleNetworkOperations(input);
-      }
-
-      // Process management
-      if (lowerInput.includes('process') || lowerInput.includes('kill') || lowerInput.includes('task')) {
-        return await this.handleProcessManagement(input);
-      }
-
-      // Automation operations
-      if (lowerInput.includes('screenshot') || lowerInput.includes('record') || lowerInput.includes('schedule')) {
-        return await this.handleAutomationOperations(input);
-      }
-
-      // Utility operations
-      if (lowerInput.includes('system info') || lowerInput.includes('check system') || lowerInput.includes('status')) {
-        return await this.handleUtilityOperations(input);
-      }
-
-      // Open app and go to URL (e.g., "Open Chrome and go to gmail.com")
-      const openAppUrlMatch = lowerInput.match(/open (\w+)(?: and go to ([^ ]+))/i);
-      if (openAppUrlMatch) {
-        const appName = openAppUrlMatch[1];
-        const url = openAppUrlMatch[2].startsWith('http') ? openAppUrlMatch[2] : `https://${openAppUrlMatch[2]}`;
-        const appResult = await this.handleAppLaunch(`open ${appName}`);
-        if (appResult.success) {
-          await shell.openExternal(url);
-          this.addToHistory(input, true, `Opened ${appName} and navigated to ${url}`);
-          this.log('App+URL success', { appName, url });
-          return { success: true, message: `Opened ${appName} and navigated to ${url}` };
-        } else {
-          this.addToHistory(input, false, appResult.message);
-          this.log('App+URL failed', { appName, url, error: appResult.message });
-          return { success: false, message: appResult.message };
-        }
-      }
-
-      // App launch
-      if (lowerInput.startsWith('open') || lowerInput.startsWith('launch') || lowerInput.startsWith('start')) {
+      // Handle different command types
+      if (lowerInput.includes('open ') || lowerInput.includes('launch ') || lowerInput.includes('start ')) {
         return await this.handleAppLaunch(input);
       }
-
-      // Web search
-      if (lowerInput.startsWith('search') || lowerInput.startsWith('find') || lowerInput.includes('google')) {
+      
+      if (lowerInput.includes('search ') && (lowerInput.includes('google') || lowerInput.includes('for '))) {
         return await this.handleWebSearch(input);
       }
-
-      // YouTube search
-      if (lowerInput.includes('youtube') || lowerInput.includes('video')) {
+      
+      if (lowerInput.includes('youtube') || (lowerInput.includes('video ') && !lowerInput.includes('record'))) {
         return await this.handleYouTubeSearch(input);
       }
-
-      // Email
-      if (lowerInput.includes('email') || lowerInput.includes('mail') || lowerInput.includes('send')) {
-        return await this.handleEmailDraft(input);
+      
+      // Email handling is now done by AIProcessor
+      if (lowerInput.includes('email') || lowerInput.includes('mail') || lowerInput.includes('send') || 
+          lowerInput.includes('compose') || lowerInput.includes('draft')) {
+        return {
+          success: true,
+          message: 'Email composition request detected. This will be handled by the AI processor.',
+          data: { type: 'email_composition' }
+        };
       }
-
-      // Help
+      
+      if (lowerInput.includes('file ') || lowerInput.includes('folder ') || lowerInput.includes('create ') || 
+          lowerInput.includes('delete ') || lowerInput.includes('move ') || lowerInput.includes('copy ') || 
+          lowerInput.includes('rename ')) {
+        return await this.handleFileOperations(input);
+      }
+      
+      if (lowerInput.includes('volume ') || lowerInput.includes('brightness ') || lowerInput.includes('lock ') || 
+          lowerInput.includes('sleep ') || lowerInput.includes('shutdown ') || lowerInput.includes('restart ')) {
+        return await this.handleSystemControls(input);
+      }
+      
+      if (lowerInput.includes('copy to clipboard') || lowerInput.includes('clear clipboard') || 
+          lowerInput.includes('show clipboard')) {
+        return await this.handleClipboardOperations(input);
+      }
+      
+      if (lowerInput.includes('in chrome') || lowerInput.includes('in firefox') || lowerInput.includes('in edge') || 
+          lowerInput.includes('in safari') || lowerInput.includes('in brave')) {
+        return await this.handleBrowserAutomation('search', input, '', input);
+      }
+      
+      if (lowerInput.includes('ping ') || lowerInput.includes('check internet') || lowerInput.includes('network status') || 
+          lowerInput.includes('download ')) {
+        return await this.handleNetworkOperations(input);
+      }
+      
+      if (lowerInput.includes('kill process') || lowerInput.includes('list processes') || lowerInput.includes('task manager')) {
+        return await this.handleProcessManagement(input);
+      }
+      
+      if (lowerInput.includes('take screenshot') || lowerInput.includes('record screen') || lowerInput.includes('schedule task')) {
+        return await this.handleAutomationOperations(input);
+      }
+      
+      if (lowerInput.includes('system info') || lowerInput.includes('system status') || lowerInput.includes('memory usage') || 
+          lowerInput.includes('disk usage')) {
+        return await this.handleUtilityOperations(input);
+      }
+      
       if (lowerInput.includes('help') || lowerInput.includes('what can you do')) {
         return this.getHelpResponse();
       }
 
-      // Fallback
-      this.addToHistory(input, false, 'Unknown command');
-      this.log('Unknown command', { input });
-      return { success: false, message: 'Sorry, I did not understand that command.' };
+      // Try to launch as app if no other pattern matches
+      return await this.handleAppLaunch(input);
+      
     } catch (error) {
-      this.addToHistory(input, false, String(error));
       this.log('Command execution error', { input, error });
-      return { success: false, message: 'An error occurred while processing your command.', error: String(error) };
+      return {
+        success: false,
+        message: `Failed to execute command: ${error}`,
+        error: String(error)
+      };
     }
   }
 
@@ -554,38 +546,6 @@ export class CommandExecutor {
     }
   }
 
-  private async handleEmailDraft(input: string): Promise<CommandResult> {
-    const lowerInput = input.toLowerCase();
-    let subject = '';
-    let body = '';
-    let recipient = '';
-    if (lowerInput.includes('to ')) {
-      const toMatch = input.match(/to\s+([^,\s]+)/i);
-      if (toMatch) recipient = toMatch[1];
-    }
-    if (lowerInput.includes('asking for') || lowerInput.includes('requesting')) {
-      subject = 'Request';
-      body = input.replace(/.*?(asking for|requesting)\s+/i, '');
-    } else if (lowerInput.includes('time off')) {
-      subject = 'Time Off Request';
-      body = 'I would like to request time off. Please let me know if you need any additional information.';
-    } else {
-      subject = 'Email';
-      body = input.replace(/.*?(email|mail|send)\s+/i, '');
-    }
-    const mailtoUrl = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    try {
-      await shell.openExternal(mailtoUrl);
-      this.addToHistory(input, true, `Opened email client for ${recipient}`);
-      this.log('Email draft success', { recipient, subject, body });
-      return { success: true, message: `Opened email client${recipient ? ` to ${recipient}` : ''}.` };
-    } catch (error) {
-      this.addToHistory(input, false, `Failed to open email client: ${error}`);
-      this.log('Email draft error', { recipient, subject, body, error });
-      return { success: false, message: 'Failed to open email client. Please make sure you have a default email application configured.', error: String(error) };
-    }
-  }
-
   private getHelpResponse(): CommandResult {
     const helpText = `
 🎯 **Doppel AI Assistant - Available Commands**
@@ -602,9 +562,12 @@ export class CommandExecutor {
 • "Search React in Chrome" - Search in specific browser
 • "Open gmail.com in Firefox" - Open URL in browser
 
-📧 **Email & Communication:**
-• "Email manager asking for time off" - Draft emails
-• "Send email to team about meeting" - Compose messages
+📧 **AI-Powered Email Composition:**
+• "Email manager asking for time off" - AI composes professional email
+• "Send email to team about meeting tomorrow" - AI drafts meeting email
+• "Compose email to client requesting project update" - AI creates business email
+• "Draft email to HR about vacation request" - AI writes formal request
+• "Email boss about work from home request" - AI composes professional request
 
 📁 **File Operations:**
 • "Open file C:\\Documents\\report.txt" - Open files/folders
@@ -659,9 +622,10 @@ export class CommandExecutor {
 • Chain commands with "and then" or "then"
 • All operations are logged and can be repeated
 • Use "help" anytime to see this list
+• Email composition uses AI for professional, context-aware drafts
 
 🚀 **Advanced Features:**
-• AI-powered command interpretation
+• AI-powered email composition with OpenAI integration
 • Cross-platform support (Windows, Mac, Linux)
 • Global keyboard shortcuts
 • Voice recognition (Whisper Mode)

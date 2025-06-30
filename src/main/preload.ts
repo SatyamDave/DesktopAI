@@ -24,4 +24,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   moveWindow: (x: number, y: number) => ipcRenderer.send('move-window', x, y),
   resizeWindow: (width: number, height: number) => ipcRenderer.send('resize-window', width, height),
+  getEmailDraftHistory: (limit?: number) => ipcRenderer.invoke('get-email-draft-history', limit),
 }); 
