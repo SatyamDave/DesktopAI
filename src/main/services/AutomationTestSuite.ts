@@ -1,10 +1,12 @@
 import { CommandExecutor } from './CommandExecutor';
-import { ConfigManager } from './ConfigManager';
+import { configManager } from './ConfigManager';
 import { AIPlanner } from './AIPlanner';
 import { ClipboardManager } from './ClipboardManager';
 import { BehaviorTracker } from './BehaviorTracker';
 import { AIProcessor } from './AIProcessor';
 import { WhisperMode } from './WhisperMode';
+import { commandExecutor } from './CommandExecutor';
+import { aiProcessor } from './AIProcessor';
 
 interface TestResult {
   name: string;
@@ -27,7 +29,7 @@ interface TestSuite {
 
 export class AutomationTestSuite {
   private commandExecutor: CommandExecutor;
-  private configManager: ConfigManager;
+  private configManager: typeof configManager;
   private aiPlanner: AIPlanner;
   private clipboardManager: ClipboardManager;
   private behaviorTracker: BehaviorTracker;
@@ -35,12 +37,12 @@ export class AutomationTestSuite {
   private whisperMode: WhisperMode;
 
   constructor() {
-    this.configManager = new ConfigManager();
-    this.commandExecutor = new CommandExecutor();
-    this.aiPlanner = new AIPlanner(this.configManager);
+    this.configManager = configManager;
+    this.commandExecutor = commandExecutor;
+    this.aiPlanner = new AIPlanner();
     this.clipboardManager = new ClipboardManager();
     this.behaviorTracker = new BehaviorTracker();
-    this.aiProcessor = new AIProcessor();
+    this.aiProcessor = aiProcessor;
     this.whisperMode = new WhisperMode();
   }
 
@@ -93,13 +95,9 @@ export class AutomationTestSuite {
     // Test 2: API Configuration validation
     const apiTest = await this.runTest('API Configuration', async () => {
       const hasAI = this.configManager.hasAIConfiguration();
-      const azureConfig = this.configManager.getAzureOpenAIConfig();
-      const openAIConfig = this.configManager.getOpenAIConfig();
       
       return {
         hasAI,
-        azureConfigured: !!azureConfig,
-        openAIConfigured: !!openAIConfig,
         debugMode: this.configManager.isDebugMode()
       };
     });

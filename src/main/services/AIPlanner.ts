@@ -1,5 +1,5 @@
-import axios from 'axios';
-import { ConfigManager } from './ConfigManager';
+import { agenticCommandProcessor } from './AgenticCommandProcessor';
+import { configManager } from './ConfigManager';
 
 interface ActionStep {
   id: string;
@@ -20,213 +20,45 @@ interface PlanningResult {
 }
 
 export class AIPlanner {
-  private configManager: ConfigManager;
-  private maxRetries = 3;
-  private timeout = 10000; // 10 seconds
+  private agenticCommandProcessor: typeof agenticCommandProcessor;
+  private configManager: typeof configManager;
 
-  constructor(configManager: ConfigManager) {
+  constructor() {
+    this.agenticCommandProcessor = agenticCommandProcessor;
     this.configManager = configManager;
   }
 
-  public async planActions(command: string, context?: any): Promise<PlanningResult> {
+  public async planActions(command: string): Promise<PlanningResult> {
     try {
-      console.log(`🎯 Planning actions for command: "${command}"`);
+      console.log(`🤖 Planning actions for command: ${command}`);
       
-      // Check if we have AI configuration
-      if (!this.configManager.hasAIConfiguration()) {
-        return this.generateFallbackPlan(command);
-      }
-
-      // Try Azure OpenAI first, then OpenAI as fallback
-      const azureConfig = this.configManager.getAzureOpenAIConfig();
-      if (azureConfig) {
-        try {
-          return await this.planWithAzureOpenAI(command, context, azureConfig);
-        } catch (error) {
-          console.warn('⚠️ Azure OpenAI planning failed, trying OpenAI fallback:', error);
-        }
-      }
-
-      const openAIConfig = this.configManager.getOpenAIConfig();
-      if (openAIConfig) {
-        try {
-          return await this.planWithOpenAI(command, context, openAIConfig);
-        } catch (error) {
-          console.warn('⚠️ OpenAI planning failed:', error);
-        }
-      }
-
-      // If all AI providers fail, use fallback
-      return this.generateFallbackPlan(command);
-
-    } catch (error) {
-      console.error('❌ Error in action planning:', error);
-      return this.generateFallbackPlan(command, error as Error);
-    }
-  }
-
-  private async planWithAzureOpenAI(command: string, context: any, config: any): Promise<PlanningResult> {
-    const url = `${config.endpoint}openai/deployments/${config.deploymentName}/chat/completions?api-version=${config.apiVersion}`;
-    
-    const messages = [
-      {
-        role: 'system',
-        content: `You are an intelligent desktop assistant that breaks down user commands into actionable steps. 
-        
-        For each step, provide:
-        - A clear action description
-        - Priority (1-5, where 1 is highest)
-        - Dependencies (if any)
-        - Estimated time in seconds
-        
-        Return the response as a JSON array of objects with these fields:
-        - id: unique identifier
-        - action: what to do
-        - description: detailed explanation
-        - priority: 1-5
-        - dependencies: array of step IDs this depends on
-        - estimatedTime: time in seconds
-        
-        Focus on practical, executable steps for desktop automation.`
-      },
-      {
-        role: 'user',
-        content: `Command: "${command}"
-        Context: ${context ? JSON.stringify(context) : 'No additional context'}
-        
-        Break this down into actionable steps for a desktop assistant to execute.`
-      }
-    ];
-
-    const response = await axios.post(url, {
-      messages,
-      max_tokens: 1000,
-      temperature: 0.2,
-      top_p: 1,
-      stop: null,
-    }, {
-      headers: {
-        'api-key': config.apiKey,
-        'Content-Type': 'application/json',
-      },
-      timeout: this.timeout
-    });
-
-    const content = response.data.choices[0].message.content;
-    return this.parseAIResponse(content, command);
-  }
-
-  private async planWithOpenAI(command: string, context: any, config: any): Promise<PlanningResult> {
-    const url = 'https://api.openai.com/v1/chat/completions';
-    
-    const messages = [
-      {
-        role: 'system',
-        content: `You are an intelligent desktop assistant that breaks down user commands into actionable steps. 
-        
-        For each step, provide:
-        - A clear action description
-        - Priority (1-5, where 1 is highest)
-        - Dependencies (if any)
-        - Estimated time in seconds
-        
-        Return the response as a JSON array of objects with these fields:
-        - id: unique identifier
-        - action: what to do
-        - description: detailed explanation
-        - priority: 1-5
-        - dependencies: array of step IDs this depends on
-        - estimatedTime: time in seconds
-        
-        Focus on practical, executable steps for desktop automation.`
-      },
-      {
-        role: 'user',
-        content: `Command: "${command}"
-        Context: ${context ? JSON.stringify(context) : 'No additional context'}
-        
-        Break this down into actionable steps for a desktop assistant to execute.`
-      }
-    ];
-
-    const response = await axios.post(url, {
-      model: 'gpt-3.5-turbo',
-      messages,
-      max_tokens: 1000,
-      temperature: 0.2,
-      top_p: 1,
-      stop: null,
-    }, {
-      headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: this.timeout
-    });
-
-    const content = response.data.choices[0].message.content;
-    return this.parseAIResponse(content, command);
-  }
-
-  private parseAIResponse(content: string, originalCommand: string): PlanningResult {
-    try {
-      // Try to extract JSON from the response
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error('No JSON array found in response');
-      }
-
-      const stepsData = JSON.parse(jsonMatch[0]);
-      const steps: ActionStep[] = stepsData.map((step: any, index: number) => ({
-        id: step.id || `step_${index + 1}`,
-        action: step.action || step.description || 'Unknown action',
-        description: step.description || step.action || 'No description provided',
-        priority: step.priority || 3,
-        dependencies: step.dependencies || [],
-        estimatedTime: step.estimatedTime || 5
-      }));
-
-      const totalTime = steps.reduce((sum, step) => sum + step.estimatedTime, 0);
-      const confidence = this.calculateConfidence(steps, originalCommand);
+      // Use the AgenticCommandProcessor to process the command
+      const result = await this.agenticCommandProcessor.processCommand(command);
+      
+      // Convert the result into a planning result
+      const steps: ActionStep[] = [{
+        id: 'step_1',
+        action: 'execute_command',
+        description: result.message,
+        estimatedTime: 1000,
+        priority: 1,
+        dependencies: []
+      }];
 
       return {
-        success: true,
+        success: result.success,
         steps,
-        totalTime,
-        confidence,
-        fallback: this.generateFallbackSuggestion(originalCommand)
+        totalTime: 1000,
+        confidence: result.success ? 0.8 : 0.3,
+        fallback: result.fallback
       };
-
     } catch (error) {
-      console.error('❌ Error parsing AI response:', error);
-      return this.generateFallbackPlan(originalCommand, error as Error);
+      console.error('❌ Error planning actions:', error);
+      return this.generateFallbackPlan(command);
     }
   }
 
-  private calculateConfidence(steps: ActionStep[], command: string): number {
-    // Simple confidence calculation based on step quality
-    let confidence = 0.5; // Base confidence
-
-    // Increase confidence for more specific steps
-    const specificKeywords = ['open', 'search', 'click', 'type', 'navigate', 'send', 'create'];
-    const hasSpecificActions = steps.some(step => 
-      specificKeywords.some(keyword => 
-        step.action.toLowerCase().includes(keyword)
-      )
-    );
-    if (hasSpecificActions) confidence += 0.2;
-
-    // Increase confidence for reasonable number of steps
-    if (steps.length >= 1 && steps.length <= 5) confidence += 0.2;
-
-    // Increase confidence for steps with descriptions
-    const hasDescriptions = steps.every(step => step.description && step.description.length > 10);
-    if (hasDescriptions) confidence += 0.1;
-
-    return Math.min(confidence, 1.0);
-  }
-
-  private generateFallbackPlan(command: string, error?: Error): PlanningResult {
+  private generateFallbackPlan(command: string): PlanningResult {
     console.log(`🔄 Generating fallback plan for: "${command}"`);
     
     const lowerCommand = command.toLowerCase();
@@ -237,93 +69,53 @@ export class AIPlanner {
       const appName = this.extractAppName(command);
       steps.push({
         id: 'step_1',
-        action: `Launch ${appName}`,
-        description: `Open the ${appName} application`,
+        action: 'launch_app',
+        description: `Launch ${appName}`,
+        estimatedTime: 2000,
         priority: 1,
-        dependencies: [],
-        estimatedTime: 3
+        dependencies: []
       });
-    }
-
-    if (lowerCommand.includes('search') || lowerCommand.includes('find') || lowerCommand.includes('google')) {
-      const searchTerm = this.extractSearchTerm(command);
+    } else if (lowerCommand.includes('search') || lowerCommand.includes('find')) {
       steps.push({
         id: 'step_1',
-        action: `Search for "${searchTerm}"`,
-        description: `Perform a web search for the specified term`,
-        priority: 1,
-        dependencies: [],
-        estimatedTime: 2
+        action: 'search',
+        description: `Search for: ${command}`,
+        estimatedTime: 1500,
+        priority: 2,
+        dependencies: []
       });
-    }
-
-    if (lowerCommand.includes('email') || lowerCommand.includes('mail') || lowerCommand.includes('send')) {
+    } else if (lowerCommand.includes('email') || lowerCommand.includes('mail')) {
       steps.push({
         id: 'step_1',
-        action: 'Open email client',
-        description: 'Launch the default email application',
-        priority: 1,
-        dependencies: [],
-        estimatedTime: 3
+        action: 'compose_email',
+        description: 'Compose email',
+        estimatedTime: 3000,
+        priority: 2,
+        dependencies: []
       });
-    }
-
-    if (lowerCommand.includes('notion')) {
+    } else {
+      // Generic fallback
       steps.push({
         id: 'step_1',
-        action: 'Open Notion',
-        description: 'Launch Notion application or open in browser',
-        priority: 1,
-        dependencies: [],
-        estimatedTime: 3
+        action: 'execute_command',
+        description: `Execute: ${command}`,
+        estimatedTime: 1000,
+        priority: 2,
+        dependencies: []
       });
     }
-
-    if (lowerCommand.includes('slack')) {
-      steps.push({
-        id: 'step_1',
-        action: 'Open Slack',
-        description: 'Launch Slack application',
-        priority: 1,
-        dependencies: [],
-        estimatedTime: 3
-      });
-    }
-
-    // If no specific patterns matched, create a generic step
-    if (steps.length === 0) {
-      steps.push({
-        id: 'step_1',
-        action: 'Process command',
-        description: `Attempt to execute: ${command}`,
-        priority: 1,
-        dependencies: [],
-        estimatedTime: 5
-      });
-    }
-
-    const totalTime = steps.reduce((sum, step) => sum + step.estimatedTime, 0);
-    const fallbackMessage = error 
-      ? `AI planning failed: ${error.message}. Using fallback plan.`
-      : 'Using fallback planning due to missing AI configuration.';
 
     return {
       success: true,
       steps,
-      totalTime,
-      confidence: 0.3, // Lower confidence for fallback plans
-      fallback: fallbackMessage
+      totalTime: steps.reduce((sum, step) => sum + step.estimatedTime, 0),
+      confidence: 0.3,
+      fallback: this.generateFallbackSuggestion(command)
     };
   }
 
   private generateFallbackSuggestion(command: string): string {
-    const suggestions = [
-      'Try rephrasing your command to be more specific',
-      'Use simpler commands like "open Chrome" or "search React tutorial"',
-      'Check if the application you want to open is installed',
-      'Make sure you have the necessary permissions for the requested action'
-    ];
-    return suggestions[Math.floor(Math.random() * suggestions.length)];
+    return `Try rephrasing your command: "${command}". You can also try more specific commands like "open [app name]", "search [query]", or "compose email".`;
   }
 
   private extractAppName(command: string): string {
@@ -337,19 +129,6 @@ export class AIPlanner {
     }
     
     return 'application';
-  }
-
-  private extractSearchTerm(command: string): string {
-    const searchKeywords = ['search', 'find', 'google'];
-    const words = command.split(' ');
-    
-    for (let i = 0; i < words.length; i++) {
-      if (searchKeywords.includes(words[i].toLowerCase()) && i + 1 < words.length) {
-        return words.slice(i + 1).join(' ');
-      }
-    }
-    
-    return command;
   }
 
   public async validatePlan(plan: PlanningResult): Promise<boolean> {
@@ -387,7 +166,6 @@ export class AIPlanner {
 
     for (const step of plan.steps) {
       if (hasCircularDependency(step.id)) {
-        console.error('❌ Circular dependency detected in plan');
         return false;
       }
     }
@@ -396,53 +174,58 @@ export class AIPlanner {
   }
 
   public optimizePlan(plan: PlanningResult): PlanningResult {
-    if (!plan.success) return plan;
+    if (!plan.success || plan.steps.length === 0) {
+      return plan;
+    }
 
     // Sort steps by priority and dependencies
     const sortedSteps = [...plan.steps].sort((a, b) => {
+      // Higher priority first
       if (a.priority !== b.priority) {
         return a.priority - b.priority;
       }
+      // Fewer dependencies first
       return a.dependencies.length - b.dependencies.length;
     });
 
-    // Update step IDs to reflect new order
-    const stepMap = new Map<string, string>();
-    const optimizedSteps = sortedSteps.map((step, index) => {
-      const newId = `step_${index + 1}`;
-      stepMap.set(step.id, newId);
-      
-      return {
-        ...step,
-        id: newId,
-        dependencies: step.dependencies.map(dep => stepMap.get(dep) || dep)
-      };
-    });
-
-    const totalTime = optimizedSteps.reduce((sum, step) => sum + step.estimatedTime, 0);
+    const totalTime = sortedSteps.reduce((sum, step) => sum + step.estimatedTime, 0);
+    const confidence = this.calculateConfidence(sortedSteps);
 
     return {
       ...plan,
-      steps: optimizedSteps,
-      totalTime
+      steps: sortedSteps,
+      totalTime,
+      confidence
     };
+  }
+
+  private calculateConfidence(steps: ActionStep[]): number {
+    // Simple confidence calculation based on step quality
+    let confidence = 0.5; // Base confidence
+    
+    for (const step of steps) {
+      if (step.description.length > 10) confidence += 0.1;
+      if (step.estimatedTime > 0) confidence += 0.05;
+      if (step.priority === 1) confidence += 0.1;
+    }
+    
+    return Math.min(confidence, 1.0);
   }
 }
 
 // Legacy function for backward compatibility
 export async function planActions(command: string): Promise<string[]> {
-  const configManager = new ConfigManager();
-  const planner = new AIPlanner(configManager);
-  
   try {
+    const planner = new AIPlanner();
     const result = await planner.planActions(command);
-    if (result.success) {
-      return result.steps.map(step => step.action);
-    } else {
-      return [`Failed to plan actions: ${result.error}`];
+    
+    if (result.success && result.steps.length > 0) {
+      return result.steps.map(step => step.description);
     }
+    
+    return [command]; // Fallback to original command
   } catch (error) {
     console.error('Error in legacy planActions:', error);
-    return [`Error planning actions: ${error}`];
+    return [command]; // Fallback to original command
   }
 } 

@@ -5,17 +5,10 @@ interface ChatBarProps {
   onClose: () => void;
 }
 
-declare global {
-  interface Window {
-    electronAPI: {
-      moveWindow: (x: number, y: number) => void;
-    };
-  }
-}
-
 const ChatBar: React.FC<ChatBarProps> = ({ onClose }) => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -25,24 +18,56 @@ const ChatBar: React.FC<ChatBarProps> = ({ onClose }) => {
     if (inputEl) inputEl.focus();
   }, []);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages((msgs) => [...msgs, { role: 'user', text: input }]);
+  const handleSend = async () => {
+    if (!input.trim() || isProcessing) return;
+    
+    const userMessage = input.trim();
+    console.log('🎯 ChatBar: User sent message:', userMessage);
+    console.log('🔍 ChatBar: electronAPI available:', !!window.electronAPI);
+    console.log('🔍 ChatBar: executeCommand available:', !!window.electronAPI?.executeCommand);
+    
+    // Add user message to chat
+    setMessages((msgs) => [...msgs, { role: 'user', text: userMessage }]);
     setInput('');
-    setTimeout(() => {
-      setMessages((msgs) => [...msgs, { role: 'ai', text: 'AI is thinking...' }]);
-    }, 400);
+    setIsProcessing(true);
+    
+    try {
+      console.log('🔄 ChatBar: Sending command to main process...');
+      
+      // Send command to main process via IPC
+      const result = await window.electronAPI.executeCommand(userMessage);
+      console.log('✅ ChatBar: Main process response:', result);
+      
+      if (result.success) {
+        const aiResponse = result.result || 'Command executed successfully!';
+        console.log('🤖 ChatBar: AI response:', aiResponse);
+        setMessages((msgs) => [...msgs, { role: 'ai', text: aiResponse }]);
+      } else {
+        console.error('❌ ChatBar: Command failed:', result.error);
+        setMessages((msgs) => [...msgs, { role: 'ai', text: `Error: ${result.error}` }]);
+      }
+    } catch (error) {
+      console.error('❌ ChatBar: IPC communication error:', error);
+      console.error('❌ ChatBar: Error details:', {
+        name: (error as Error).name,
+        message: (error as Error).message,
+        stack: (error as Error).stack
+      });
+      setMessages((msgs) => [...msgs, { role: 'ai', text: 'Sorry, there was an error processing your command.' }]);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Drag logic (move window)
-  const handleDragStart = (event: any, info: any) => {
+  const handleDragStart = (_event: any, info: any) => {
     window.electronAPI?.moveWindow && window.electronAPI.moveWindow(window.screenX, window.screenY);
     dragOffset.current = {
       x: info.point.x,
       y: info.point.y,
     };
   };
-  const handleDrag = (event: any, info: any) => {
+  const handleDrag = (_event: any, info: any) => {
     const dx = info.point.x - dragOffset.current.x;
     const dy = info.point.y - dragOffset.current.y;
     const newX = window.screenX + dx;

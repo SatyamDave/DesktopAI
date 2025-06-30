@@ -18,7 +18,10 @@
     "dev:debug": "npm run dev",
     "dev:performance": "npm run dev -- --enable-logging --remote-debugging-port=9222",
     "start:laptop-safe": "npm run dev",
-    "start:emergency": "npm run dev -- --emergency-mode"
+    "start:emergency": "npm run dev -- --emergency-mode",
+    "install:ollama": "npm install -g ollama",
+    "start:ollama": "ollama serve",
+    "pull:models": "ollama pull phi && ollama pull mistral && ollama pull llama2"
   },
   "keywords": [
     "ai",
@@ -56,7 +59,24 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.1",
     "sql.js": "^1.9.0",
-    "tailwindcss": "^3.3.6"
+    "tailwindcss": "^3.3.6",
+    "screenshot-desktop": "^1.12.7",
+    "node-record-lpcm16": "^1.0.1",
+    "node-wit": "^6.5.0",
+    "ws": "^8.14.2",
+    "node-cron": "^3.0.3",
+    "memory-cache": "^0.2.0",
+    "glob": "^10.3.10",
+    "chalk": "^5.3.0",
+    "ora": "^7.0.1",
+    "commander": "^11.1.0",
+    "inquirer": "^9.2.12",
+    "conf": "^10.1.0",
+    "electron-store": "^8.1.0",
+    "node-notifier": "^10.0.1",
+    "systeminformation": "^5.21.23",
+    "ps-list": "^8.0.0",
+    "node-key-sender": "^1.0.11"
   },
   "build": {
     "appId": "com.doppel.assistant",

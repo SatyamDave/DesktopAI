@@ -25,4 +25,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   moveWindow: (x: number, y: number) => ipcRenderer.send('move-window', x, y),
   resizeWindow: (width: number, height: number) => ipcRenderer.send('resize-window', width, height),
   getEmailDraftHistory: (limit?: number) => ipcRenderer.invoke('get-email-draft-history', limit),
+  
+  // Real-time AI assistant methods
+  processRealTimeCommand: (command: string) => ipcRenderer.invoke('process-real-time-command', command),
+  getSystemStatus: () => ipcRenderer.invoke('get-system-status'),
+  toggleVoiceListening: (enabled: boolean) => ipcRenderer.invoke('toggle-voice-listening', enabled),
+  getVoiceStatus: () => ipcRenderer.invoke('get-voice-status'),
+  
+  // Local LLM management
+  getAvailableModels: () => ipcRenderer.invoke('get-available-models'),
+  setActiveModel: (modelName: string) => ipcRenderer.invoke('set-active-model', modelName),
+  testModel: (modelName: string) => ipcRenderer.invoke('test-model', modelName),
+  
+  // System control methods
+  getActiveWindow: () => ipcRenderer.invoke('get-active-window'),
+  takeScreenshot: (region?: any) => ipcRenderer.invoke('take-screenshot', region),
+  extractTextFromScreenshot: (capture?: any) => ipcRenderer.invoke('extract-text-from-screenshot', capture),
+  
+  // Action handler management
+  getActionHandlers: () => ipcRenderer.invoke('get-action-handlers'),
+  clearCommandQueue: () => ipcRenderer.invoke('clear-command-queue'),
 }); 

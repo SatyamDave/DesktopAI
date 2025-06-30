@@ -3,17 +3,11 @@ import { motion } from 'framer-motion';
 
 interface FloatingOrbProps {
   onClick?: () => void;
+  isUltraLightweight?: boolean;
+  emergencyMode?: boolean;
 }
 
-declare global {
-  interface Window {
-    electronAPI: {
-      moveWindow: (x: number, y: number) => void;
-    };
-  }
-}
-
-const FloatingOrb: React.FC<FloatingOrbProps> = ({ onClick }) => {
+const FloatingOrb: React.FC<FloatingOrbProps> = ({ onClick, isUltraLightweight = false, emergencyMode = false }) => {
   const orbRef = useRef<HTMLButtonElement>(null);
   const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -37,66 +31,101 @@ const FloatingOrb: React.FC<FloatingOrbProps> = ({ onClick }) => {
     window.electronAPI?.moveWindow && window.electronAPI.moveWindow(newX, newY);
   };
 
+  // Determine orb styling based on mode
+  const getOrbStyling = () => {
+    if (emergencyMode) {
+      return {
+        background: 'linear-gradient(135deg, #ef4444, #dc2626, #b91c1c)',
+        shadow: '0 4px 32px 0 rgba(239, 68, 68, 0.4)',
+        hoverShadow: '0 8px 48px 0 rgba(239, 68, 68, 0.6)'
+      };
+    }
+    
+    if (isUltraLightweight) {
+      return {
+        background: 'linear-gradient(135deg, #10b981, #059669, #047857)',
+        shadow: '0 4px 32px 0 rgba(16, 185, 129, 0.3)',
+        hoverShadow: '0 8px 48px 0 rgba(16, 185, 129, 0.5)'
+      };
+    }
+    
+    return {
+      background: 'linear-gradient(135deg, #8b5cf6, #7c3aed, #6d28d9)',
+      shadow: '0 4px 32px 0 rgba(139, 92, 246, 0.3)',
+      hoverShadow: '0 8px 48px 0 rgba(139, 92, 246, 0.5)'
+    };
+  };
+
+  const orbStyle = getOrbStyling();
+
   return (
     <motion.button
       ref={orbRef}
       type="button"
       aria-label="Open AI Assistant"
       tabIndex={0}
-      className="fixed bottom-6 right-6 outline-none focus:ring-2 focus:ring-violet-400 pointer-events-auto"
+      className="fixed bottom-6 right-6 outline-none focus:ring-2 focus:ring-violet-400 pointer-events-auto z-50"
       style={{ touchAction: 'none' }}
-      initial={{ scale: 1, boxShadow: '0 4px 32px 0 rgba(80, 80, 255, 0.18)' }}
-      animate={{
-        scale: [1, 1.08, 1],
-        boxShadow: [
-          '0 4px 32px 0 rgba(80, 80, 255, 0.18)',
-          '0 8px 40px 0 rgba(120, 80, 255, 0.28)',
-          '0 4px 32px 0 rgba(80, 80, 255, 0.18)'
-        ]
+      initial={{ scale: 1, opacity: 0 }}
+      animate={{ 
+        scale: 1, 
+        opacity: 1,
+        boxShadow: orbStyle.shadow
       }}
       transition={{
-        duration: 2.5,
-        repeat: Infinity,
-        ease: 'easeInOut',
+        duration: 0.5,
+        ease: "easeOut"
       }}
       whileHover={{
-        scale: 1.13,
-        boxShadow: '0 8px 48px 0 rgba(120, 80, 255, 0.45)',
-        filter: 'brightness(1.15)'
+        scale: 1.15,
+        boxShadow: orbStyle.hoverShadow,
+        filter: 'brightness(1.2)'
       }}
       whileFocus={{
-        scale: 1.13,
-        boxShadow: '0 8px 48px 0 rgba(120, 80, 255, 0.45)',
-        filter: 'brightness(1.15)'
+        scale: 1.15,
+        boxShadow: orbStyle.hoverShadow,
+        filter: 'brightness(1.2)'
+      }}
+      whileTap={{
+        scale: 0.95
       }}
       drag
       dragMomentum={false}
-      dragElastic={0.18}
+      dragElastic={0.1}
       dragConstraints={false}
       onDragStart={handleDragStart}
       onDrag={handleDrag}
       onClick={onClick}
     >
       <span
-        className="block w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-violet-400 via-blue-400 to-fuchsia-600 dark:from-violet-700 dark:via-blue-800 dark:to-fuchsia-800 backdrop-blur-md bg-opacity-60 border border-white/30 shadow-lg flex items-center justify-center select-none"
+        className="block w-16 h-16 rounded-full backdrop-blur-md bg-opacity-80 border border-white/40 shadow-lg flex items-center justify-center select-none"
         style={{
-          boxShadow:
-            '0 2px 16px 0 rgba(80, 80, 255, 0.18), 0 1.5px 8px 0 rgba(120, 80, 255, 0.10)',
+          background: orbStyle.background,
+          boxShadow: orbStyle.shadow,
         }}
       >
         <span className="sr-only">Open AI Assistant</span>
         <svg
-          className="w-6 h-6 sm:w-8 sm:h-8 text-white dark:text-violet-200 opacity-90"
+          className="w-8 h-8 text-white opacity-90"
           fill="none"
           viewBox="0 0 32 32"
           aria-hidden="true"
         >
-          <circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="2.5" opacity="0.18" />
-          <circle cx="16" cy="16" r="7" fill="currentColor" opacity="0.18" />
-          <circle cx="16" cy="16" r="5" fill="currentColor" opacity="0.35" />
+          <circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="2.5" opacity="0.3" />
+          <circle cx="16" cy="16" r="7" fill="currentColor" opacity="0.3" />
+          <circle cx="16" cy="16" r="5" fill="currentColor" opacity="0.5" />
           <circle cx="16" cy="16" r="3" fill="currentColor" />
         </svg>
       </span>
+      
+      {/* Mode indicator */}
+      {(isUltraLightweight || emergencyMode) && (
+        <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-white border-2 border-gray-800 flex items-center justify-center">
+          <span className="text-xs font-bold">
+            {emergencyMode ? '🚨' : '⚡'}
+          </span>
+        </div>
+      )}
     </motion.button>
   );
 };

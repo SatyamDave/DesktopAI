@@ -4,8 +4,10 @@ import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { planActions } from './AIPlanner';
-import { ConfigManager } from './ConfigManager';
+import { configManager } from './ConfigManager';
+import { browserAutomationService } from './BrowserAutomationService';
+import { appLaunchService } from './AppLaunchService';
+import { agenticCommandProcessor } from './AgenticCommandProcessor';
 
 const execAsync = promisify(exec);
 
@@ -14,15 +16,6 @@ interface CommandResult {
   message: string;
   data?: any;
   error?: string;
-}
-
-interface AppConfig {
-  name: string;
-  aliases: string[];
-  windowsPath?: string;
-  macPath?: string;
-  linuxPath?: string;
-  url?: string;
 }
 
 interface CommandHistory {
@@ -36,217 +29,19 @@ export class CommandExecutor {
   private commandHistory: CommandHistory[] = [];
   private maxHistorySize = 50;
   private historyFile: string;
-  private configManager: ConfigManager;
+  private configManager: typeof configManager;
   private debug: boolean;
-
-  // App configurations for different platforms
-  private appConfigs: AppConfig[] = [
-    {
-      name: 'chrome',
-      aliases: ['browser', 'google chrome', 'web browser', 'chromium'],
-      windowsPath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      macPath: '/Applications/Google Chrome.app',
-      linuxPath: 'google-chrome'
-    },
-    {
-      name: 'edge',
-      aliases: ['microsoft edge', 'edge browser'],
-      windowsPath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-      macPath: '/Applications/Microsoft Edge.app',
-      linuxPath: 'microsoft-edge'
-    },
-    {
-      name: 'firefox',
-      aliases: ['mozilla', 'firefox browser'],
-      windowsPath: 'C:\\Program Files\\Mozilla Firefox\\firefox.exe',
-      macPath: '/Applications/Firefox.app',
-      linuxPath: 'firefox'
-    },
-    {
-      name: 'brave',
-      aliases: ['brave browser'],
-      windowsPath: 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
-      macPath: '/Applications/Brave Browser.app',
-      linuxPath: 'brave-browser'
-    },
-    {
-      name: 'opera',
-      aliases: ['opera browser'],
-      windowsPath: 'C:\\Users\\%USERNAME%\\AppData\\Local\\Programs\\Opera\\launcher.exe',
-      macPath: '/Applications/Opera.app',
-      linuxPath: 'opera'
-    },
-    {
-      name: 'notepad',
-      aliases: ['text editor', 'notes', 'notepad++'],
-      windowsPath: 'notepad.exe',
-      macPath: '/Applications/TextEdit.app',
-      linuxPath: 'gedit'
-    },
-    {
-      name: 'calculator',
-      aliases: ['calc', 'math', 'calculator app'],
-      windowsPath: 'calc.exe',
-      macPath: '/Applications/Calculator.app',
-      linuxPath: 'gnome-calculator'
-    },
-    {
-      name: 'explorer',
-      aliases: ['file explorer', 'files', 'folder', 'file manager'],
-      windowsPath: 'explorer.exe',
-      macPath: '/System/Library/CoreServices/Finder.app',
-      linuxPath: 'nautilus'
-    },
-    {
-      name: 'terminal',
-      aliases: ['command prompt', 'cmd', 'powershell', 'terminal', 'shell'],
-      windowsPath: 'cmd.exe',
-      macPath: '/Applications/Utilities/Terminal.app',
-      linuxPath: 'gnome-terminal'
-    },
-    {
-      name: 'spotify',
-      aliases: ['music', 'audio', 'spotify app'],
-      windowsPath: 'C:\\Users\\%USERNAME%\\AppData\\Roaming\\Spotify\\Spotify.exe',
-      macPath: '/Applications/Spotify.app',
-      linuxPath: 'spotify'
-    },
-    {
-      name: 'discord',
-      aliases: ['chat', 'communication', 'discord app'],
-      windowsPath: 'C:\\Users\\%USERNAME%\\AppData\\Local\\Discord\\app-*\\Discord.exe',
-      macPath: '/Applications/Discord.app',
-      linuxPath: 'discord'
-    },
-    {
-      name: 'slack',
-      aliases: ['slack app', 'team chat', 'work chat'],
-      windowsPath: 'C:\\Users\\%USERNAME%\\AppData\\Local\\slack\\slack.exe',
-      macPath: '/Applications/Slack.app',
-      linuxPath: 'slack'
-    },
-    {
-      name: 'teams',
-      aliases: ['microsoft teams', 'teams app', 'work teams'],
-      windowsPath: 'C:\\Users\\%USERNAME%\\AppData\\Local\\Microsoft\\Teams\\current\\Teams.exe',
-      macPath: '/Applications/Microsoft Teams.app',
-      linuxPath: 'teams'
-    },
-    {
-      name: 'outlook',
-      aliases: ['email', 'microsoft outlook', 'outlook app'],
-      windowsPath: 'C:\\Program Files\\Microsoft Office\\root\\Office16\\OUTLOOK.EXE',
-      macPath: '/Applications/Microsoft Outlook.app',
-      linuxPath: 'outlook',
-      url: 'https://outlook.office.com'
-    },
-    {
-      name: 'word',
-      aliases: ['microsoft word', 'word processor', 'doc editor'],
-      windowsPath: 'C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE',
-      macPath: '/Applications/Microsoft Word.app',
-      linuxPath: 'libreoffice --writer'
-    },
-    {
-      name: 'excel',
-      aliases: ['microsoft excel', 'spreadsheet', 'xls editor'],
-      windowsPath: 'C:\\Program Files\\Microsoft Office\\root\\Office16\\EXCEL.EXE',
-      macPath: '/Applications/Microsoft Excel.app',
-      linuxPath: 'libreoffice --calc'
-    },
-    {
-      name: 'powerpoint',
-      aliases: ['microsoft powerpoint', 'presentation', 'ppt editor'],
-      windowsPath: 'C:\\Program Files\\Microsoft Office\\root\\Office16\\POWERPNT.EXE',
-      macPath: '/Applications/Microsoft PowerPoint.app',
-      linuxPath: 'libreoffice --impress'
-    },
-    {
-      name: 'paint',
-      aliases: ['mspaint', 'paint app', 'drawing'],
-      windowsPath: 'mspaint.exe',
-      macPath: '/Applications/Preview.app',
-      linuxPath: 'pinta'
-    },
-    {
-      name: 'calendar',
-      aliases: ['calendar app', 'schedule', 'events'],
-      windowsPath: 'outlookcal:',
-      macPath: '/Applications/Calendar.app',
-      linuxPath: 'gnome-calendar',
-      url: 'https://calendar.google.com'
-    },
-    {
-      name: 'filezilla',
-      aliases: ['ftp', 'filezilla app'],
-      windowsPath: 'C:\\Program Files\\FileZilla FTP Client\\filezilla.exe',
-      macPath: '/Applications/FileZilla.app',
-      linuxPath: 'filezilla'
-    },
-    {
-      name: 'github desktop',
-      aliases: ['github', 'git client', 'github app'],
-      windowsPath: 'C:\\Users\\%USERNAME%\\AppData\\Local\\GitHubDesktop\\GitHubDesktop.exe',
-      macPath: '/Applications/GitHub Desktop.app',
-      linuxPath: 'github-desktop'
-    },
-    {
-      name: 'steam',
-      aliases: ['games', 'steam app'],
-      windowsPath: 'C:\\Program Files (x86)\\Steam\\steam.exe',
-      macPath: '/Applications/Steam.app',
-      linuxPath: 'steam'
-    },
-    {
-      name: 'whatsapp',
-      aliases: ['whatsapp app', 'messenger', 'chat'],
-      windowsPath: 'C:\\Users\\%USERNAME%\\AppData\\Local\\WhatsApp\\WhatsApp.exe',
-      macPath: '/Applications/WhatsApp.app',
-      linuxPath: 'whatsapp',
-      url: 'https://web.whatsapp.com'
-    },
-    {
-      name: 'telegram',
-      aliases: ['telegram app', 'messenger', 'chat'],
-      windowsPath: 'C:\\Users\\%USERNAME%\\AppData\\Roaming\\Telegram Desktop\\Telegram.exe',
-      macPath: '/Applications/Telegram.app',
-      linuxPath: 'telegram',
-      url: 'https://web.telegram.org'
-    },
-    {
-      name: 'vscode',
-      aliases: ['code', 'visual studio code', 'editor', 'vs code'],
-      windowsPath: 'C:\\Users\\%USERNAME%\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe',
-      macPath: '/Applications/Visual Studio Code.app',
-      linuxPath: 'code'
-    },
-    {
-      name: 'figma',
-      aliases: ['design', 'figma app'],
-      url: 'https://www.figma.com'
-    },
-    {
-      name: 'zoom',
-      aliases: ['meeting', 'video call', 'zoom app'],
-      windowsPath: 'C:\\Users\\%USERNAME%\\AppData\\Roaming\\Zoom\\bin\\Zoom.exe',
-      macPath: '/Applications/zoom.us.app',
-      linuxPath: 'zoom'
-    },
-    {
-      name: 'notion',
-      aliases: ['notes', 'notion app', 'workspace'],
-      url: 'https://www.notion.so'
-    }
-  ];
+  private browserAutomationService: typeof browserAutomationService;
+  private appLaunchService: typeof appLaunchService;
+  private agenticCommandProcessor: typeof agenticCommandProcessor;
 
   constructor() {
-    this.configManager = new ConfigManager();
-    this.debug = this.configManager.isDebugMode();
-    const dbDir = path.join(os.homedir(), '.doppel');
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
-    }
-    this.historyFile = path.join(dbDir, 'command-history.json');
+    this.historyFile = path.join(os.homedir(), '.doppel', 'command-history.json');
+    this.configManager = configManager;
+    this.debug = process.env.DEBUG_MODE === 'true';
+    this.browserAutomationService = browserAutomationService;
+    this.appLaunchService = appLaunchService;
+    this.agenticCommandProcessor = agenticCommandProcessor;
     this.loadCommandHistory();
   }
 
@@ -292,351 +87,50 @@ export class CommandExecutor {
   public async executeCommand(input: string): Promise<CommandResult> {
     this.log(`Executing command: "${input}"`);
     try {
-      // Use AIPlanner to break down the command into steps
-      const steps = await planActions(input);
-      if (steps.length > 0) {
-        const results: CommandResult[] = [];
-        for (const step of steps) {
-          const result = await this.executeSingleCommand(step);
-          results.push(result);
-          this.log('AI Step result', { step, result });
-        }
-        const allSuccess = results.every(r => r.success);
-        const summary = results.map(r => r.message).join(' | ');
-        this.log(`Command executed successfully: "${input}"`);
-        return { success: allSuccess, message: summary, data: results };
-      }
+      // Use the new AgenticCommandProcessor for natural language commands
+      const result = await this.agenticCommandProcessor.processCommand(input);
+      
+      // Add to history
+      this.addToHistory(input, result.success, result.message);
+      
+      this.log(`Command executed: "${input}" - Success: ${result.success}`);
+      return result;
     } catch (e) {
-      this.log('AIPlanner failed, falling back to legacy logic', { error: String(e) });
-      // Fallback to legacy logic
-      // Support multi-step/compound commands: split by 'and then', 'then', 'and'
-      const steps = input.split(/\band then\b|\bthen\b|\band\b/i).map(s => s.trim()).filter(Boolean);
-      if (steps.length > 1) {
-        const results: CommandResult[] = [];
-        for (const step of steps) {
-          const result = await this.executeSingleCommand(step);
-          results.push(result);
-          this.log('Step result', { step, result });
-        }
-        const allSuccess = results.every(r => r.success);
-        const summary = results.map(r => r.message).join(' | ');
-        this.log(`Command executed successfully: "${input}"`);
-        return { success: allSuccess, message: summary, data: results };
-      } else {
-        return this.executeSingleCommand(input);
-      }
-    }
-    // If all else fails
-    return this.executeSingleCommand(input);
-  }
-
-  private async executeSingleCommand(input: string): Promise<CommandResult> {
-    const lowerInput = input.toLowerCase();
-    
-    try {
-      // Check for sequential commands
-      if (lowerInput.includes(' and then ') || lowerInput.includes(' then ')) {
-        const commands = input.split(/\s+(?:and\s+)?then\s+/i);
-        const results = await this.executeCommandQueue(commands);
-        const successCount = results.filter(r => r.success).length;
-        return {
-          success: successCount === results.length,
-          message: `Executed ${successCount}/${results.length} commands successfully.`,
-          data: results
-        };
-      }
-
-      // Handle different command types
-      if (lowerInput.includes('open ') || lowerInput.includes('launch ') || lowerInput.includes('start ')) {
-        return await this.handleAppLaunch(input);
+      this.log('AgenticCommandProcessor failed, falling back to legacy logic', { error: String(e) });
+      
+      // Fallback to legacy logic for specific command types
+      const lowerInput = input.toLowerCase();
+      
+      // Handle specific command patterns that the agentic processor might miss
+      if (lowerInput.includes('open browser') || lowerInput.includes('launch browser')) {
+        return await this.handleBrowserLaunch(input);
       }
       
-      if (lowerInput.includes('search ') && (lowerInput.includes('google') || lowerInput.includes('for '))) {
-        return await this.handleWebSearch(input);
-      }
-      
-      if (lowerInput.includes('youtube') || (lowerInput.includes('video ') && !lowerInput.includes('record'))) {
-        return await this.handleYouTubeSearch(input);
-      }
-      
-      // Email handling is now done by AIProcessor
-      if (lowerInput.includes('email') || lowerInput.includes('mail') || lowerInput.includes('send') || 
-          lowerInput.includes('compose') || lowerInput.includes('draft')) {
-        return {
-          success: true,
-          message: 'Email composition request detected. This will be handled by the AI processor.',
-          data: { type: 'email_composition' }
-        };
-      }
-      
-      if (lowerInput.includes('file ') || lowerInput.includes('folder ') || lowerInput.includes('create ') || 
-          lowerInput.includes('delete ') || lowerInput.includes('move ') || lowerInput.includes('copy ') || 
-          lowerInput.includes('rename ')) {
-        return await this.handleFileOperations(input);
-      }
-      
-      if (lowerInput.includes('volume ') || lowerInput.includes('brightness ') || lowerInput.includes('lock ') || 
-          lowerInput.includes('sleep ') || lowerInput.includes('shutdown ') || lowerInput.includes('restart ')) {
-        return await this.handleSystemControls(input);
-      }
-      
-      if (lowerInput.includes('copy to clipboard') || lowerInput.includes('clear clipboard') || 
-          lowerInput.includes('show clipboard')) {
-        return await this.handleClipboardOperations(input);
-      }
-      
-      if (lowerInput.includes('in chrome') || lowerInput.includes('in firefox') || lowerInput.includes('in edge') || 
-          lowerInput.includes('in safari') || lowerInput.includes('in brave')) {
-        return await this.handleBrowserAutomation('search', input, '', input);
-      }
-      
-      if (lowerInput.includes('ping ') || lowerInput.includes('check internet') || lowerInput.includes('network status') || 
-          lowerInput.includes('download ')) {
-        return await this.handleNetworkOperations(input);
-      }
-      
-      if (lowerInput.includes('kill process') || lowerInput.includes('list processes') || lowerInput.includes('task manager')) {
-        return await this.handleProcessManagement(input);
-      }
-      
-      if (lowerInput.includes('take screenshot') || lowerInput.includes('record screen') || lowerInput.includes('schedule task')) {
-        return await this.handleAutomationOperations(input);
-      }
-      
-      if (lowerInput.includes('system info') || lowerInput.includes('system status') || lowerInput.includes('memory usage') || 
-          lowerInput.includes('disk usage')) {
-        return await this.handleUtilityOperations(input);
-      }
-      
-      if (lowerInput.includes('help') || lowerInput.includes('what can you do')) {
-        return this.getHelpResponse();
-      }
-
-      // Try to launch as app if no other pattern matches
-      return await this.handleAppLaunch(input);
-      
-    } catch (error) {
-      this.log('Command execution error', { input, error });
+      // For any other commands, try the agentic processor again or provide a helpful response
       return {
         success: false,
-        message: `Failed to execute command: ${error}`,
-        error: String(error)
+        message: 'I couldn\'t understand that command.',
+        error: String(e),
+        data: { type: 'unrecognized_command' }
       };
     }
   }
 
-  private async handleAppLaunch(input: string): Promise<CommandResult> {
-    const lowerInput = input.toLowerCase();
-    const app = this.appConfigs.find(config =>
-      config.aliases.some(alias => lowerInput.includes(alias)) ||
-      lowerInput.includes(config.name)
-    );
-    if (!app) {
-      this.addToHistory(input, false, 'App not found');
-      this.log('App not found', { input });
-      return { success: false, message: 'App not found. Try "Open Chrome" or "Launch Notepad".' };
-    }
+  private async handleBrowserLaunch(input: string): Promise<CommandResult> {
     try {
-      if (app.url) {
-        await shell.openExternal(app.url);
-        this.addToHistory(input, true, `Opened ${app.name} in browser`);
-        this.log('App opened in browser', { app });
-        return { success: true, message: `Opened ${app.name} in browser.` };
-      } else {
-        const appPath = this.getAppPath(app);
-        if (!appPath) {
-          this.addToHistory(input, false, `App path not found for ${app.name}`);
-          this.log('App path not found', { app });
-          return { success: false, message: `App path not found for ${app.name}.` };
-        }
-        await this.launchApp(appPath);
-        this.addToHistory(input, true, `Launched ${app.name}`);
-        this.log('App launched', { app });
-        return { success: true, message: `Launched ${app.name}.` };
-      }
+      // Try to open the default browser
+      await shell.openExternal('https://www.google.com');
+      return {
+        success: true,
+        message: 'Opened your default browser.'
+      };
     } catch (error) {
-      this.addToHistory(input, false, `Failed to launch ${app.name}: ${error}`);
-      this.log('App launch error', { app, error });
-      return { success: false, message: `Failed to launch ${app.name}.`, error: String(error) };
+      return {
+        success: false,
+        message: 'Failed to open browser.',
+        error: String(error)
+      };
     }
-  }
-
-  private getAppPath(app: AppConfig): string | null {
-    const platform = os.platform();
-    switch (platform) {
-      case 'win32':
-        return app.windowsPath || null;
-      case 'darwin':
-        return app.macPath || null;
-      case 'linux':
-        return app.linuxPath || null;
-      default:
-        return null;
-    }
-  }
-
-  private async launchApp(appPath: string): Promise<void> {
-    const platform = os.platform();
-    if (platform === 'win32') {
-      const expandedPath = appPath.replace(/%USERNAME%/g, os.userInfo().username);
-      if (expandedPath.includes('*')) {
-        const basePath = expandedPath.substring(0, expandedPath.lastIndexOf('\\'));
-        const pattern = expandedPath.substring(expandedPath.lastIndexOf('\\') + 1);
-        if (fs.existsSync(basePath)) {
-          const dirs = fs.readdirSync(basePath);
-          const matchingDir = dirs.find(dir => dir.startsWith(pattern.replace('*', '')));
-          if (matchingDir) {
-            const fullPath = path.join(basePath, matchingDir, 'Discord.exe');
-            if (fs.existsSync(fullPath)) {
-              await execAsync(`"${fullPath}"`);
-              return;
-            }
-          }
-        }
-      }
-      if (fs.existsSync(expandedPath)) {
-        await execAsync(`"${expandedPath}"`);
-      } else {
-        await execAsync(appPath);
-      }
-    } else if (platform === 'darwin') {
-      await execAsync(`open "${appPath}"`);
-    } else {
-      await execAsync(appPath);
-    }
-  }
-
-  private async handleWebSearch(input: string): Promise<CommandResult> {
-    const searchTerms = input.replace(/search|find|google/gi, '').trim();
-    if (!searchTerms) {
-      this.addToHistory(input, false, 'No search terms provided');
-      this.log('No search terms', { input });
-      return { success: false, message: 'What would you like me to search for?' };
-    }
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchTerms)}`;
-    try {
-      await shell.openExternal(searchUrl);
-      this.addToHistory(input, true, `Searched for "${searchTerms}"`);
-      this.log('Web search success', { searchTerms });
-      return { success: true, message: `Searched for "${searchTerms}".` };
-    } catch (error) {
-      this.addToHistory(input, false, `Failed to search: ${error}`);
-      this.log('Web search error', { searchTerms, error });
-      return { success: false, message: 'Failed to open search in browser.', error: String(error) };
-    }
-  }
-
-  private async handleYouTubeSearch(input: string): Promise<CommandResult> {
-    const searchTerms = input.replace(/youtube|video|search|find/gi, '').trim();
-    if (!searchTerms) {
-      this.addToHistory(input, false, 'No YouTube search terms');
-      this.log('No YouTube search terms', { input });
-      return { success: false, message: 'What would you like me to search for on YouTube?' };
-    }
-    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchTerms)}`;
-    try {
-      await shell.openExternal(searchUrl);
-      this.addToHistory(input, true, `YouTube searched for "${searchTerms}"`);
-      this.log('YouTube search success', { searchTerms });
-      return { success: true, message: `Searched YouTube for "${searchTerms}".` };
-    } catch (error) {
-      this.addToHistory(input, false, `Failed YouTube search: ${error}`);
-      this.log('YouTube search error', { searchTerms, error });
-      return { success: false, message: 'Failed to open YouTube search.', error: String(error) };
-    }
-  }
-
-  private getHelpResponse(): CommandResult {
-    const helpText = `
-🎯 **Doppel AI Assistant - Available Commands**
-
-📱 **App Operations:**
-• "Open Chrome" - Launch applications
-• "Start Notepad" - Start system apps
-• "Launch VSCode" - Open development tools
-• "Open Figma" - Launch web apps
-
-🌐 **Web & Search:**
-• "Search React tutorial" - Google search
-• "YouTube React tutorial" - YouTube search
-• "Search React in Chrome" - Search in specific browser
-• "Open gmail.com in Firefox" - Open URL in browser
-
-📧 **AI-Powered Email Composition:**
-• "Email manager asking for time off" - AI composes professional email
-• "Send email to team about meeting tomorrow" - AI drafts meeting email
-• "Compose email to client requesting project update" - AI creates business email
-• "Draft email to HR about vacation request" - AI writes formal request
-• "Email boss about work from home request" - AI composes professional request
-
-📁 **File Operations:**
-• "Open file C:\\Documents\\report.txt" - Open files/folders
-• "Create folder Projects" - Create new folders
-• "Create file notes.txt" - Create new files
-• "Delete file temp.txt" - Remove files/folders
-• "Move file old.txt to backup\\" - Move files/folders
-• "Copy file source.txt to destination\\" - Copy files/folders
-• "Rename file old.txt to new.txt" - Rename files/folders
-
-🎛️ **System Controls:**
-• "Volume up/down/mute/50" - Control audio
-• "Brightness up/down/80" - Adjust screen brightness
-• "Lock system" - Lock computer
-• "Sleep system" - Put to sleep
-• "Shutdown system" - Turn off computer
-• "Restart system" - Reboot computer
-
-📋 **Clipboard Operations:**
-• "Copy to clipboard Hello World" - Copy text
-• "Clear clipboard" - Empty clipboard
-• "Show clipboard history" - View clipboard history
-
-🌐 **Network Operations:**
-• "Ping google.com" - Test network connectivity
-• "Check internet" - Verify internet connection
-• "Network status" - Get network information
-• "Download https://example.com/file.zip to C:\\Downloads" - Download files
-
-⚙️ **Process Management:**
-• "Kill process notepad.exe" - End specific process
-• "List processes" - Show running processes
-• "Task manager" - Open system task manager
-
-📸 **Automation Operations:**
-• "Take screenshot" - Capture screen
-• "Record screen" - Start screen recording
-• "Schedule task 'open Chrome' at 14:30" - Set scheduled tasks
-
-💻 **Utility Operations:**
-• "System info" - Get detailed system information
-• "System status" - Check system performance
-• "Memory usage" - View RAM usage
-• "Disk usage" - Check storage space
-
-🔗 **Sequential Commands:**
-• "Open Chrome and then search React tutorial" - Multiple actions
-• "Open Notepad and then create file notes.txt" - Chain operations
-
-💡 **Tips:**
-• Use natural language - "Open my browser" works
-• Chain commands with "and then" or "then"
-• All operations are logged and can be repeated
-• Use "help" anytime to see this list
-• Email composition uses AI for professional, context-aware drafts
-
-🚀 **Advanced Features:**
-• AI-powered email composition with OpenAI integration
-• Cross-platform support (Windows, Mac, Linux)
-• Global keyboard shortcuts
-• Voice recognition (Whisper Mode)
-• Behavior tracking and suggestions
-• Network diagnostics and file downloads
-• Process management and system monitoring
-• Screen capture and automation
-• System utilities and performance monitoring
-    `.trim();
-
-    return { success: true, message: helpText };
   }
 
   public getCommandHistory(limit = 10): CommandHistory[] {
@@ -646,31 +140,48 @@ export class CommandExecutor {
   public getCommandSuggestions(input: string): string[] {
     const lowerInput = input.toLowerCase();
     const suggestions: string[] = [];
-    this.appConfigs.forEach(app => {
-      if (app.name.includes(lowerInput) || app.aliases.some(alias => alias.includes(lowerInput))) {
-        suggestions.push(`Open ${app.name}`);
-      }
+    
+    // Get app suggestions from AppLaunchService
+    const appSuggestions = this.appLaunchService.getAppSuggestions(lowerInput);
+    appSuggestions.forEach(appName => {
+      suggestions.push(`Open ${appName}`);
     });
+
+    // Add other common commands
     if (lowerInput.includes('search') || lowerInput.includes('find')) {
-      suggestions.push('Search for React tutorials');
-      suggestions.push('Find TypeScript documentation');
+      suggestions.push('Search for...', 'YouTube search...');
+    }
+    if (lowerInput.includes('file') || lowerInput.includes('folder')) {
+      suggestions.push('Open file...', 'Create folder...', 'Delete file...');
+    }
+    if (lowerInput.includes('volume') || lowerInput.includes('sound')) {
+      suggestions.push('Volume up', 'Volume down', 'Mute');
+    }
+    if (lowerInput.includes('brightness') || lowerInput.includes('screen')) {
+      suggestions.push('Brightness up', 'Brightness down');
+    }
+    if (lowerInput.includes('system') || lowerInput.includes('computer')) {
+      suggestions.push('Lock system', 'Sleep system', 'Shutdown system');
+    }
+    if (lowerInput.includes('clipboard') || lowerInput.includes('copy')) {
+      suggestions.push('Copy to clipboard...', 'Show clipboard history');
+    }
+    if (lowerInput.includes('screenshot') || lowerInput.includes('screen')) {
+      suggestions.push('Take screenshot', 'Record screen');
     }
     if (lowerInput.includes('email') || lowerInput.includes('mail')) {
-      suggestions.push('Send email to manager asking for time off');
-      suggestions.push('Email team about meeting');
+      suggestions.push('Compose email...', 'Open email client');
     }
-    if (lowerInput.includes('youtube') || lowerInput.includes('video')) {
-      suggestions.push('YouTube React tutorial');
-      suggestions.push('Video Logan Paul');
-    }
-    return suggestions.slice(0, 5);
+
+    return suggestions.slice(0, 10);
   }
 
   public async executeCommandQueue(commands: string[]): Promise<CommandResult[]> {
+    this.log('Executing command queue', { commands });
     const results: CommandResult[] = [];
     for (const command of commands) {
       this.log('Queue executing', { command });
-      const result = await this.executeSingleCommand(command);
+      const result = await this.executeCommand(command);
       results.push(result);
       await new Promise(resolve => setTimeout(resolve, 500));
     }
@@ -1125,30 +636,26 @@ export class CommandExecutor {
     } else if (action === 'open') {
       url = target.startsWith('http') ? target : `https://${target}`;
     }
-    // Find browser app config
-    const app = this.appConfigs.find(cfg => cfg.name === browser || cfg.aliases.includes(browser));
-    if (!app) {
-      this.addToHistory(originalInput, false, `Browser ${browser} not found`);
-      return { success: false, message: `Browser ${browser} not found.` };
-    }
+    
     try {
-      // On Windows, launch browser with URL as argument
-      const platform = os.platform();
-      let browserPath = this.getAppPath(app);
-      if (!browserPath) {
-        this.addToHistory(originalInput, false, `Browser path not found for ${browser}`);
-        return { success: false, message: `Browser path not found for ${browser}.` };
-      }
-      if (platform === 'win32') {
-        browserPath = browserPath.replace(/%USERNAME%/g, os.userInfo().username);
-        await execAsync(`"${browserPath}" "${url}"`);
-      } else if (platform === 'darwin') {
-        await execAsync(`open -a "${browserPath}" "${url}"`);
+      // Use the AppLaunchService to launch the browser with the URL
+      const launchInput = `open ${browser}`;
+      const result = await this.appLaunchService.launchApp(launchInput);
+      
+      if (result.success) {
+        // If browser launched successfully, try to open the URL
+        try {
+          await shell.openExternal(url);
+          this.addToHistory(originalInput, true, `Opened ${url} in ${browser}`);
+          return { success: true, message: `Opened ${url} in ${browser}.` };
+        } catch (urlError) {
+          this.addToHistory(originalInput, true, `Launched ${browser} but failed to open URL`);
+          return { success: true, message: `Launched ${browser}. You can manually navigate to ${url}.` };
+        }
       } else {
-        await execAsync(`${browserPath} "${url}"`);
+        this.addToHistory(originalInput, false, `Failed to launch ${browser}: ${result.message}`);
+        return { success: false, message: `Failed to launch ${browser}: ${result.message}` };
       }
-      this.addToHistory(originalInput, true, `Opened ${url} in ${browser}`);
-      return { success: true, message: `Opened ${url} in ${browser}.` };
     } catch (error) {
       this.addToHistory(originalInput, false, `Failed to open in ${browser}: ${error}`);
       return { success: false, message: `Failed to open in ${browser}.`, error: String(error) };
@@ -1538,4 +1045,45 @@ export class CommandExecutor {
       return { success: false, message: 'Failed to get disk usage.', error: String(error) };
     }
   }
-} 
+
+  // --- Email Handling Handler ---
+  private async handleEmailComposition(input: string): Promise<CommandResult> {
+    try {
+      this.log('Starting email composition via Gmail automation', { input });
+      
+      // Check if browser automation is available
+      if (!this.browserAutomationService.isAvailable()) {
+        return {
+          success: false,
+          message: 'Browser automation is not available. Please ensure Puppeteer is installed.',
+          error: 'Browser automation unavailable'
+        };
+      }
+
+      // Use BrowserAutomationService to compose email via Gmail
+      const result = await this.browserAutomationService.composeEmailViaGmail(input);
+      
+      this.addToHistory(input, true, 'Email composed via Gmail automation');
+      this.log('Email composition completed', { input, result });
+      
+      return {
+        success: true,
+        message: result,
+        data: { type: 'gmail_automation', result }
+      };
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.addToHistory(input, false, `Email composition failed: ${errorMessage}`);
+      this.log('Email composition error', { input, error });
+      
+      return {
+        success: false,
+        message: `Failed to compose email: ${errorMessage}`,
+        error: errorMessage
+      };
+    }
+  }
+}
+
+export const commandExecutor = new CommandExecutor(); 

@@ -12,12 +12,16 @@ console.log('DEBUG ENV:', {
 import { app, BrowserWindow, globalShortcut, ipcMain, screen, Tray, Menu, nativeImage } from 'electron';
 import { ClipboardManager } from './services/ClipboardManager';
 import { BehaviorTracker } from './services/BehaviorTracker';
-import { AIProcessor } from './services/AIProcessor';
+import { aiProcessor } from './services/AIProcessor';
 import { WhisperMode } from './services/WhisperMode';
-import { CommandExecutor } from './services/CommandExecutor';
+import { commandExecutor } from './services/CommandExecutor';
 import { ConfigManager } from './services/ConfigManager';
 import { PerformanceOptimizer } from './services/PerformanceOptimizer';
 import { DatabaseManager } from './services/DatabaseManager';
+// Real-time AI services
+import { localLLMService } from './services/LocalLLMService';
+import { systemControlService } from './services/SystemControlService';
+import { realTimeCommandProcessor } from './services/RealTimeCommandProcessor';
 
 class DoppelApp {
   private mainWindow: BrowserWindow | null = null;
@@ -25,9 +29,7 @@ class DoppelApp {
   private tray: Tray | null = null;
   private clipboardManager: ClipboardManager;
   private behaviorTracker: BehaviorTracker;
-  private aiProcessor: AIProcessor;
   private whisperMode: WhisperMode;
-  private commandExecutor: CommandExecutor;
   private performanceOptimizer: PerformanceOptimizer;
   private databaseManager: DatabaseManager;
   private isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
@@ -39,15 +41,21 @@ class DoppelApp {
   private whisperInitialized = false;
   private aiProcessorInitialized = false;
 
+  // Add these lines:
+  private aiProcessor = aiProcessor;
+  private commandExecutor = commandExecutor;
+
+  // Real-time AI services
+  private realTimeProcessor = realTimeCommandProcessor;
+  private localLLM = localLLMService;
+  private systemControl = systemControlService;
+
   constructor() {
     this.performanceOptimizer = PerformanceOptimizer.getInstance();
     this.databaseManager = DatabaseManager.getInstance();
     this.clipboardManager = new ClipboardManager();
     this.behaviorTracker = new BehaviorTracker();
-    this.aiProcessor = new AIProcessor();
     this.whisperMode = new WhisperMode();
-    this.commandExecutor = new CommandExecutor();
-    
     console.log(`🔧 Development mode: ${this.isDev}`);
     console.log(`📦 App packaged: ${app.isPackaged}`);
     
@@ -345,11 +353,21 @@ class DoppelApp {
     try {
       console.log('🪟 Creating floating orb window...');
       
+      // Get screen dimensions for better positioning
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+      
+      // Position the orb in the bottom-right corner with some margin
+      const orbSize = 100;
+      const margin = 20;
+      const x = screenWidth - orbSize - margin;
+      const y = screenHeight - orbSize - margin;
+      
       this.floatingWindow = new BrowserWindow({
-        width: 100,
-        height: 100,
-        x: 100,
-        y: 100,
+        width: orbSize,
+        height: orbSize,
+        x: x,
+        y: y,
         frame: false,
         transparent: true,
         alwaysOnTop: true,
@@ -357,13 +375,21 @@ class DoppelApp {
         resizable: false,
         minimizable: false,
         maximizable: false,
-        show: true,
+        show: false, // Don't show until ready
+        titleBarStyle: 'hidden',
+        titleBarOverlay: false,
         webPreferences: {
           preload: path.join(__dirname, 'preload.js'),
           contextIsolation: true,
-          nodeIntegration: false
+          nodeIntegration: false,
+          webSecurity: false,
+          allowRunningInsecureContent: true,
+          experimentalFeatures: false
         }
       });
+
+      // Disable hardware acceleration for this window
+      this.floatingWindow.webContents.setVisualZoomLevelLimits(1, 1);
 
       const url = this.isDev ? 'http://localhost:3000' : `file://${path.join(__dirname, '../renderer/index.html')}`;
       console.log(`🚀 Loading URL: ${url}`);
@@ -372,22 +398,41 @@ class DoppelApp {
 
       this.floatingWindow.on('ready-to-show', () => {
         console.log('✅ Orb window ready to show');
+        this.floatingWindow?.show();
         this.floatingWindow?.focus();
       });
 
       this.floatingWindow.webContents.on('did-finish-load', () => {
         console.log('✅ Orb page finished loading');
-        this.floatingWindow?.show();
-        this.floatingWindow?.focus();
+        // Small delay to ensure everything is ready
+        setTimeout(() => {
+          this.floatingWindow?.show();
+          this.floatingWindow?.focus();
+        }, 100);
       });
 
       this.floatingWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
         console.error(`❌ Failed to load ${validatedURL}: ${errorDescription}`);
+        // Retry loading after a short delay
+        setTimeout(() => {
+          console.log('🔄 Retrying to load orb window...');
+          this.floatingWindow?.loadURL(url);
+        }, 2000);
       });
 
       this.floatingWindow.on('close', (event) => {
         event.preventDefault();
         this.floatingWindow?.hide();
+      });
+
+      // Handle window focus to ensure it stays on top
+      this.floatingWindow.on('blur', () => {
+        // Keep the window on top even when it loses focus
+        setTimeout(() => {
+          if (this.floatingWindow && !this.floatingWindow.isDestroyed()) {
+            this.floatingWindow.setAlwaysOnTop(true);
+          }
+        }, 100);
       });
 
       console.log('✅ Floating orb window created successfully');
@@ -695,6 +740,156 @@ class DoppelApp {
       } catch (error) {
         console.error('❌ Error getting email draft history:', error);
         return { success: false, error: (error as Error).message, history: [] };
+      }
+    });
+
+    // Real-time AI assistant handlers
+    ipcMain.handle('process-real-time-command', async (event, command: string) => {
+      try {
+        console.log(`⚡ Processing real-time command: "${command}"`);
+        const result = await this.realTimeProcessor.processCommand(command);
+        return result;
+      } catch (error) {
+        console.error('❌ Error processing real-time command:', error);
+        return {
+          success: false,
+          intent: 'error',
+          confidence: 0,
+          action: 'error',
+          response: `Error: ${error}`,
+          latency: 0,
+          context: { timestamp: Date.now() }
+        };
+      }
+    });
+
+    ipcMain.handle('get-system-status', async () => {
+      try {
+        const [systemInfo, queueStatus] = await Promise.all([
+          this.systemControl.getSystemInfo(),
+          this.realTimeProcessor.getQueueStatus()
+        ]);
+
+        return {
+          cpu: systemInfo.cpu.usage,
+          memory: systemInfo.memory.percentage,
+          activeModel: this.localLLM.getAvailableModels()[0] || 'none',
+          queueLength: queueStatus.queueLength
+        };
+      } catch (error) {
+        console.error('❌ Error getting system status:', error);
+        return {
+          cpu: 0,
+          memory: 0,
+          activeModel: 'unknown',
+          queueLength: 0
+        };
+      }
+    });
+
+    ipcMain.handle('toggle-voice-listening', async (event, enabled: boolean) => {
+      try {
+        // This would integrate with the existing WhisperMode service
+        if (enabled) {
+          await this.ensureWhisperModeInitialized();
+          await this.whisperMode.start();
+        } else {
+          this.whisperMode.stop();
+        }
+        return { success: true };
+      } catch (error) {
+        console.error('❌ Error toggling voice listening:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('get-voice-status', async () => {
+      try {
+        const status = this.whisperMode.getStatus();
+        return { isListening: status.isActive };
+      } catch (error) {
+        console.error('❌ Error getting voice status:', error);
+        return { isListening: false, error: (error as Error).message };
+      }
+    });
+
+    // Local LLM management
+    ipcMain.handle('get-available-models', async () => {
+      try {
+        return this.localLLM.getAvailableModels();
+      } catch (error) {
+        console.error('❌ Error getting available models:', error);
+        return [];
+      }
+    });
+
+    ipcMain.handle('set-active-model', async (event, modelName: string) => {
+      try {
+        const success = this.localLLM.setActiveModel(modelName);
+        return { success };
+      } catch (error) {
+        console.error('❌ Error setting active model:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('test-model', async (event, modelName: string) => {
+      try {
+        const success = await this.localLLM.testModel(modelName);
+        return { success };
+      } catch (error) {
+        console.error('❌ Error testing model:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // System control handlers
+    ipcMain.handle('get-active-window', async () => {
+      try {
+        return await this.systemControl.getActiveWindow();
+      } catch (error) {
+        console.error('❌ Error getting active window:', error);
+        return null;
+      }
+    });
+
+    ipcMain.handle('take-screenshot', async (event, region?: any) => {
+      try {
+        const capture = await this.systemControl.takeScreenshot(region);
+        return { success: true, capture };
+      } catch (error) {
+        console.error('❌ Error taking screenshot:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('extract-text-from-screenshot', async (event, capture?: any) => {
+      try {
+        const text = await this.systemControl.extractTextFromScreenshot(capture);
+        return { success: true, text };
+      } catch (error) {
+        console.error('❌ Error extracting text from screenshot:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // Action handler management
+    ipcMain.handle('get-action-handlers', async () => {
+      try {
+        return this.realTimeProcessor.getActionHandlers();
+      } catch (error) {
+        console.error('❌ Error getting action handlers:', error);
+        return [];
+      }
+    });
+
+    ipcMain.handle('clear-command-queue', async () => {
+      try {
+        this.realTimeProcessor.clearQueue();
+        return { success: true };
+      } catch (error) {
+        console.error('❌ Error clearing command queue:', error);
+        return { success: false, error: (error as Error).message };
       }
     });
   }

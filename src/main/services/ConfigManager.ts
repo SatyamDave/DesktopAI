@@ -87,74 +87,56 @@ export class ConfigManager {
   }
 
   private encrypt(text: string): string {
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipher('aes-256-cbc', this.encryptionKey);
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return iv.toString('hex') + ':' + encrypted;
+    try {
+      const iv = crypto.randomBytes(16);
+      const key = crypto.createHash('sha256').update(this.encryptionKey).digest();
+      const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+      let encrypted = cipher.update(text, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      return iv.toString('hex') + ':' + encrypted;
+    } catch (err) {
+      console.warn('[ConfigManager] Encryption failed, using plain config:', err instanceof Error ? err.message : String(err));
+      return text;
+    }
   }
 
   private decrypt(encryptedText: string): string {
-    const parts = encryptedText.split(':');
-    const iv = Buffer.from(parts[0], 'hex');
-    const encrypted = parts[1];
-    const decipher = crypto.createDecipher('aes-256-cbc', this.encryptionKey);
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
+    try {
+      const parts = encryptedText.split(':');
+      if (parts.length !== 2) throw new Error('Invalid encrypted text format');
+      const iv = Buffer.from(parts[0], 'hex');
+      const encrypted = parts[1];
+      const key = crypto.createHash('sha256').update(this.encryptionKey).digest();
+      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return decrypted;
+    } catch (err) {
+      console.warn('[ConfigManager] Decryption failed, using plain config:', err instanceof Error ? err.message : String(err));
+      return encryptedText;
+    }
   }
 
   private loadConfiguration() {
     try {
       // Load from environment variables first
       this.loadFromEnvironment();
-      
-      // Load from encrypted config file if it exists
-      if (fs.existsSync(this.encryptedConfigFile)) {
-        const encryptedData = fs.readFileSync(this.encryptedConfigFile, 'utf8');
-        const decryptedData = this.decrypt(encryptedData);
-        const config = JSON.parse(decryptedData);
-        
-        // Merge with environment variables (env vars take precedence)
-        this.apiConfig = { ...config.api, ...this.apiConfig };
-        this.appConfig = { ...this.appConfig, ...config.app };
-      }
-      
-      // Load from plain config file if it exists (for development)
+      // Only load Gemini config
       if (fs.existsSync(this.configFile)) {
         const config = JSON.parse(fs.readFileSync(this.configFile, 'utf8'));
         this.apiConfig = { ...this.apiConfig, ...config.api };
         this.appConfig = { ...this.appConfig, ...config.app };
       }
-
       this.validateConfiguration();
       this.saveConfiguration();
-      
-      console.log('✅ Configuration loaded successfully');
+      console.log('✅ Configuration loaded successfully (Gemini only mode)');
     } catch (error) {
-      console.error('❌ Error loading configuration:', error);
+      console.error('❌ Error loading configuration:', error instanceof Error ? error.message : error);
       this.createDefaultConfiguration();
     }
   }
 
   private loadFromEnvironment() {
-    // Azure OpenAI
-    if (process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_DEPLOYMENT_NAME) {
-      this.apiConfig.azureOpenAI = {
-        apiKey: process.env.AZURE_OPENAI_API_KEY,
-        endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-        deploymentName: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
-        apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-04-01-preview'
-      };
-    }
-
-    // OpenAI
-    if (process.env.OPENAI_API_KEY) {
-      this.apiConfig.openAI = {
-        apiKey: process.env.OPENAI_API_KEY
-      };
-    }
-
     // Google
     if (process.env.GOOGLE_API_KEY) {
       this.apiConfig.google = {
@@ -176,31 +158,13 @@ export class ConfigManager {
   private validateConfiguration() {
     const errors: string[] = [];
 
-    // Check for at least one AI provider
-    if (!this.apiConfig.azureOpenAI && !this.apiConfig.openAI) {
-      errors.push('No AI provider configured. Please set up Azure OpenAI or OpenAI API keys.');
-    }
-
-    // Validate Azure OpenAI config if present
-    if (this.apiConfig.azureOpenAI) {
-      if (!this.apiConfig.azureOpenAI.apiKey || this.apiConfig.azureOpenAI.apiKey === 'your_azure_openai_api_key_here') {
-        errors.push('Azure OpenAI API key is not properly configured.');
-      }
-      if (!this.apiConfig.azureOpenAI.endpoint || this.apiConfig.azureOpenAI.endpoint.includes('your-resource')) {
-        errors.push('Azure OpenAI endpoint is not properly configured.');
-      }
-    }
-
-    // Validate OpenAI config if present
-    if (this.apiConfig.openAI) {
-      if (!this.apiConfig.openAI.apiKey || this.apiConfig.openAI.apiKey === 'your_openai_api_key_here') {
-        errors.push('OpenAI API key is not properly configured.');
-      }
+    // Only check for Gemini
+    if (!process.env.GEMINI_API_KEY && (!this.apiConfig.google || !this.apiConfig.google.apiKey)) {
+      errors.push('No Gemini API key configured. Please set GEMINI_API_KEY in your environment variables.');
     }
 
     if (errors.length > 0) {
-      console.warn('⚠️ Configuration validation warnings:');
-      errors.forEach(error => console.warn(`   - ${error}`));
+      console.warn('Configuration validation warnings:', errors);
     }
   }
 
@@ -224,8 +188,6 @@ export class ConfigManager {
       // Save plain version for development (without sensitive data)
       const devConfig = {
         api: {
-          azureOpenAI: this.apiConfig.azureOpenAI ? { configured: true } : undefined,
-          openAI: this.apiConfig.openAI ? { configured: true } : undefined,
           google: this.apiConfig.google ? { configured: true } : undefined,
           slack: this.apiConfig.slack ? { configured: true } : undefined
         },
@@ -241,14 +203,6 @@ export class ConfigManager {
   }
 
   // Public methods for accessing configuration
-  public getAzureOpenAIConfig() {
-    return this.apiConfig.azureOpenAI;
-  }
-
-  public getOpenAIConfig() {
-    return this.apiConfig.openAI;
-  }
-
   public getGoogleConfig() {
     return this.apiConfig.google;
   }
@@ -275,13 +229,11 @@ export class ConfigManager {
   }
 
   public hasAIConfiguration(): boolean {
-    return !!(this.apiConfig.azureOpenAI || this.apiConfig.openAI);
+    return !!(this.apiConfig.google);
   }
 
   public getConfigurationStatus() {
     return {
-      azureOpenAI: !!this.apiConfig.azureOpenAI,
-      openAI: !!this.apiConfig.openAI,
       google: !!this.apiConfig.google,
       slack: !!this.apiConfig.slack,
       debugMode: this.appConfig.debugMode,
@@ -310,4 +262,6 @@ export class ConfigManager {
       return false;
     }
   }
-} 
+}
+
+export const configManager = new ConfigManager(); 

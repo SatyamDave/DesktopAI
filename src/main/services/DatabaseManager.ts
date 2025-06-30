@@ -1,4 +1,17 @@
-import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
+// Optional sql.js import
+let initSqlJs: any = null;
+let Database: any = null;
+let SqlJsStatic: any = null;
+
+try {
+  const sqlJs = require('sql.js');
+  initSqlJs = sqlJs.default || sqlJs;
+  Database = sqlJs.Database;
+  SqlJsStatic = sqlJs.SqlJsStatic;
+} catch (error) {
+  console.warn('⚠️ sql.js not available - database features will be disabled');
+}
+
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -20,13 +33,17 @@ interface BatchOperation {
 
 export class DatabaseManager {
   private static instance: DatabaseManager;
-  private sqlJS: SqlJsStatic | null = null;
-  private databases = new Map<string, Database>();
-  private configs = new Map<string, DatabaseConfig>();
-  private batchQueues = new Map<string, BatchOperation[]>();
-  private saveTimers = new Map<string, NodeJS.Timeout>();
-  private performanceOptimizer: PerformanceOptimizer;
+  private databases: Map<string, any> = new Map();
+  private sqlJs: any = null;
   private isInitialized = false;
+  private configs: Map<string, DatabaseConfig> = new Map();
+  private saveIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private lastSaveTimes: Map<string, number> = new Map();
+  private connectionPools: Map<string, any[]> = new Map();
+  private maxConnections = 5;
+  private debug = false;
+  private performanceOptimizer: PerformanceOptimizer;
+  private batchQueues = new Map<string, BatchOperation[]>();
 
   private constructor() {
     this.performanceOptimizer = PerformanceOptimizer.getInstance();
@@ -41,13 +58,18 @@ export class DatabaseManager {
 
   public async initialize(): Promise<void> {
     if (this.isInitialized) return;
-    
+
+    if (!initSqlJs) {
+      console.warn('⚠️ Database manager: sql.js not available');
+      return;
+    }
+
     try {
-      this.sqlJS = await initSqlJs();
+      this.sqlJs = await initSqlJs();
       this.isInitialized = true;
-      console.log('✅ DatabaseManager initialized');
+      console.log('✅ Database manager initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize DatabaseManager:', error);
+      console.error('❌ Error initializing database manager:', error);
       throw error;
     }
   }
@@ -72,42 +94,30 @@ export class DatabaseManager {
     console.log(`📊 Database registered: ${config.name}`);
   }
 
-  public async getDatabase(name: string): Promise<Database> {
+  public async getDatabase(name: string): Promise<any> {
     if (!this.isInitialized) {
       await this.initialize();
     }
-    
+
     if (this.databases.has(name)) {
-      return this.databases.get(name)!;
+      return this.databases.get(name);
     }
-    
+
     const config = this.configs.get(name);
     if (!config) {
-      throw new Error(`Database '${name}' not registered`);
+      throw new Error(`Database '${name}' not configured`);
     }
-    
-    const db = await this.createDatabase(config);
+
+    let db: any;
+    if (fs.existsSync(config.filePath)) {
+      const filebuffer = fs.readFileSync(config.filePath);
+      db = new this.sqlJs.Database(filebuffer);
+    } else {
+      db = new this.sqlJs.Database();
+    }
+
     this.databases.set(name, db);
     return db;
-  }
-
-  private async createDatabase(config: DatabaseConfig): Promise<Database> {
-    try {
-      let db: Database;
-      
-      if (fs.existsSync(config.filePath)) {
-        const filebuffer = fs.readFileSync(config.filePath);
-        db = new this.sqlJS!.Database(filebuffer);
-      } else {
-        db = new this.sqlJS!.Database();
-      }
-      
-      console.log(`📊 Database created/loaded: ${config.name}`);
-      return db;
-    } catch (error) {
-      console.error(`❌ Error creating database ${config.name}:`, error);
-      throw error;
-    }
   }
 
   public async executeQuery(name: string, sql: string, params: any[] = []): Promise<any> {
@@ -188,12 +198,12 @@ export class DatabaseManager {
       await this.saveDatabase(name);
     }, interval);
     
-    this.saveTimers.set(name, timer);
+    this.saveIntervals.set(name, timer);
   }
 
   private scheduleSave(name: string): void {
     // Debounce save operations
-    const existingTimer = this.saveTimers.get(name);
+    const existingTimer = this.saveIntervals.get(name);
     if (existingTimer) {
       clearTimeout(existingTimer);
     }
@@ -202,7 +212,7 @@ export class DatabaseManager {
       await this.saveDatabase(name);
     }, 1000); // 1 second debounce
     
-    this.saveTimers.set(name, timer);
+    this.saveIntervals.set(name, timer);
   }
 
   private async saveDatabase(name: string): Promise<void> {
@@ -242,10 +252,10 @@ export class DatabaseManager {
     }
     
     // Clear timer
-    const timer = this.saveTimers.get(name);
+    const timer = this.saveIntervals.get(name);
     if (timer) {
       clearTimeout(timer);
-      this.saveTimers.delete(name);
+      this.saveIntervals.delete(name);
     }
     
     console.log(`📊 Database ${name} closed`);
