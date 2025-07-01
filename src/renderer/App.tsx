@@ -7,6 +7,7 @@ import Settings from './components/Settings';
 import FloatingOrb from './components/FloatingOrb';
 import RealTimeOverlay from './components/RealTimeOverlay';
 import GlassmorphicOverlay from './components/GlassmorphicOverlay';
+import Onboarding from './components/Onboarding';
 
 interface Message {
   id: string;
@@ -29,6 +30,7 @@ interface AppState {
 }
 
 const App: React.FC = () => {
+  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('delo_onboarding_complete'));
   const [state, setState] = useState<AppState>({
     messages: [],
     isListening: false,
@@ -44,6 +46,11 @@ const App: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 50, y: 50 });
+
+  const handleOnboardingFinish = () => {
+    localStorage.setItem('delo_onboarding_complete', 'true');
+    setShowOnboarding(false);
+  };
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages arrive
@@ -216,6 +223,10 @@ const App: React.FC = () => {
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
+
+  if (showOnboarding) {
+    return <Onboarding onFinish={handleOnboardingFinish} />;
+  }
 
   return (
     <div 
