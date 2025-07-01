@@ -4,7 +4,8 @@ import ChatBar from './components/ChatBar';
 import CommandInput from './components/CommandInput';
 import { DELOInterface } from './components/DELOInterface';
 import Settings from './components/Settings';
-import FloatingOrb from './components/FloatingOrb';
+import DELOAssistantPanel from './components/DELOAssistantPanel';
+import Onboarding from './components/Onboarding';
 import RealTimeOverlay from './components/RealTimeOverlay';
 import GlassmorphicOverlay from './components/GlassmorphicOverlay';
 
@@ -41,6 +42,9 @@ const App: React.FC = () => {
     theme: 'auto'
   });
 
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showAssistant, setShowAssistant] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 50, y: 50 });
@@ -67,6 +71,26 @@ const App: React.FC = () => {
 
     return () => mediaQuery.removeEventListener('change', handleThemeChange);
   }, [state.theme]);
+
+  useEffect(() => {
+    const done = localStorage.getItem('delo-onboarded');
+    if (!done) {
+      setShowOnboarding(true);
+    } else {
+      setShowAssistant(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.altKey && e.code === 'Space') {
+        e.preventDefault();
+        setShowAssistant(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -339,6 +363,25 @@ const App: React.FC = () => {
           <div className="settings-overlay">
             <Settings />
           </div>
+        )}
+
+        {showAssistant && (
+          <DELOAssistantPanel
+            isVisible={true}
+            onClose={() => setShowAssistant(false)}
+            onSubmit={handleDELOCommand}
+            onVoice={() => console.log('voice')}
+          />
+        )}
+
+        {showOnboarding && (
+          <Onboarding
+            onComplete={() => {
+              localStorage.setItem('delo-onboarded', 'true');
+              setShowOnboarding(false);
+              setShowAssistant(true);
+            }}
+          />
         )}
       </div>
     </div>
