@@ -18,7 +18,11 @@
     "dev:debug": "npm run dev",
     "dev:performance": "npm run dev -- --enable-logging --remote-debugging-port=9222",
     "start:laptop-safe": "npm run dev",
-    "start:emergency": "npm run dev -- --emergency-mode"
+    "start:emergency": "npm run dev -- --emergency-mode",
+    "start:mac": "chmod +x start-mac-dev.sh && ./start-mac-dev.sh",
+    "start:mac:ultra": "chmod +x start-mac-ultra-lightweight.sh && ./start-mac-ultra-lightweight.sh",
+    "start:mac:laptop": "chmod +x start-laptop-safe.sh && ./start-laptop-safe.sh",
+    "start:mac:simple": "chmod +x start-mac-simple.sh && ./start-mac-simple.sh"
   },
   "keywords": [
     "ai",

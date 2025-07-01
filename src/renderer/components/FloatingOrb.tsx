@@ -78,22 +78,25 @@ const FloatingOrb: React.FC<FloatingOrbProps> = ({ onClick }) => {
       onClick={onClick}
     >
       <span
-        className="block w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-violet-400 via-blue-400 to-fuchsia-600 dark:from-violet-700 dark:via-blue-800 dark:to-fuchsia-800 backdrop-blur-md bg-opacity-60 border border-white/30 shadow-lg flex items-center justify-center select-none"
+        className="block w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 shadow-lg flex items-center justify-center select-none relative overflow-hidden"
         style={{
           boxShadow:
-            '0 2px 16px 0 rgba(80, 80, 255, 0.18), 0 1.5px 8px 0 rgba(120, 80, 255, 0.10)',
+            '0 4px 24px 0 rgba(0, 0, 0, 0.1), 0 2px 8px 0 rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
         }}
       >
+        {/* Subtle background pattern */}
+        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-gray-50/50 to-gray-100/50 dark:from-gray-800/50 dark:to-gray-900/50"></div>
+        
         <span className="sr-only">Open AI Assistant</span>
         <svg
-          className="w-6 h-6 sm:w-8 sm:h-8 text-white dark:text-violet-200 opacity-90"
+          className="w-6 h-6 sm:w-8 sm:h-8 text-gray-600 dark:text-gray-300 relative z-10"
           fill="none"
           viewBox="0 0 32 32"
           aria-hidden="true"
         >
-          <circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="2.5" opacity="0.18" />
-          <circle cx="16" cy="16" r="7" fill="currentColor" opacity="0.18" />
-          <circle cx="16" cy="16" r="5" fill="currentColor" opacity="0.35" />
+          <circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="2" opacity="0.2" />
+          <circle cx="16" cy="16" r="7" fill="currentColor" opacity="0.3" />
+          <circle cx="16" cy="16" r="5" fill="currentColor" opacity="0.5" />
           <circle cx="16" cy="16" r="3" fill="currentColor" />
         </svg>
       </span>

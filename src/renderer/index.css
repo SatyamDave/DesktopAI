@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  background: transparent !important;
+}
+
 :root {
   --doppel-primary: #6366f1;
   --doppel-secondary: #8b5cf6;

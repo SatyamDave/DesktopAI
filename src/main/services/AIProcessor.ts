@@ -48,6 +48,9 @@ export class AIProcessor {
   private openaiEndpoint: string | null = null;
   private openaiDeployment: string | null = null;
   private geminiApiKey: string | null = null;
+  private aiProcessorInitialized: boolean = false;
+  private whisperInitialized: boolean = false;
+  private whisperMode: any; // Assuming whisperMode is defined elsewhere in the file
 
   constructor() {
     this.configManager = new ConfigManager();
@@ -82,6 +85,8 @@ export class AIProcessor {
     if (fs.existsSync(this.dbPath)) {
       const filebuffer = fs.readFileSync(this.dbPath);
       this.db = new this.sqlJS.Database(filebuffer);
+      // Ensure tables exist even in existing database
+      this.initializeDatabase();
     } else {
       this.db = new this.sqlJS.Database();
       this.initializeDatabase();
@@ -154,9 +159,40 @@ export class AIProcessor {
       
       const intent = this.detectIntent(input);
       
-      // Handle email composition with EmailService
+      // Handle email composition with validation
       if (intent === 'email') {
-        return await this.emailService.composeAndOpenEmail(input, context);
+        return await this.handleEmailComposition(input, context);
+      }
+      
+      // Handle simple conversational inputs directly with Gemini
+      if (intent === 'general' || intent === 'help') {
+        if (this.geminiApiKey) {
+          try {
+            const prompt = `You are a helpful AI assistant. The user said: "${input}". Please provide a friendly, helpful response. Keep it concise and conversational.`;
+            const response = await this.callGeminiAPI(prompt);
+            if (this.debug) console.log(`[AIProcessor] Using Gemini for conversational response`);
+            
+            // Save conversation to database
+            const conversation: Conversation = {
+              id: 0,
+              user_input: input,
+              ai_response: response,
+              timestamp: Date.now(),
+              context: context ? JSON.stringify(context) : '',
+              intent: intent
+            };
+            
+            this.db!.run(
+              'INSERT INTO conversations (user_input, ai_response, timestamp, context, intent) VALUES (?, ?, ?, ?, ?)',
+              [conversation.user_input, conversation.ai_response, conversation.timestamp, conversation.context, conversation.intent]
+            );
+            this.saveToDisk();
+            
+            return response;
+          } catch (error) {
+            if (this.debug) console.log(`[AIProcessor] Gemini failed for conversation, falling back to command executor:`, error);
+          }
+        }
       }
       
       const conversation: Conversation = {
@@ -190,28 +226,81 @@ export class AIProcessor {
 
   private async handleEmailComposition(input: string, context?: any): Promise<string> {
     try {
-      if (!this.openaiApiKey && !this.geminiApiKey) {
-        return 'No AI API key configured. Please set OPENAI_API_KEY or GEMINI_API_KEY in your environment variables.';
+      // Ensure database is initialized
+      if (!this.db) {
+        await this.init();
       }
-
-      const emailDraft = await this.generateEmailDraft(input, context);
       
-      // Save email draft to database
+      // Validate email address first
+      const emailValidation = this.validateEmailAddress(input);
+      
+      if (!emailValidation.hasValidEmail && emailValidation.nameOnly) {
+        if (emailValidation.nameOnly === 'email_only') {
+          // Check if we have a pending email request in context
+          if (context && context.pendingEmailRequest) {
+            // User provided email address for a pending request
+            const completeRequest = context.pendingEmailRequest.replace('{EMAIL}', emailValidation.emailAddress!);
+            if (this.debug) console.log(`[AIProcessor] Processing pending email request: "${completeRequest}"`);
+            
+            // Clear the pending request
+            delete context.pendingEmailRequest;
+            
+            // Process the complete request
+            return await this.processEmailRequest(completeRequest, context);
+          } else {
+            return `I see you provided an email address (${emailValidation.emailAddress}), but I need more context about what you'd like to write. Please provide a complete request like "write an email to ${emailValidation.emailAddress} about the meeting" or "compose an email to ${emailValidation.emailAddress} regarding the project update".`;
+          }
+        }
+        
+        // Extract the name and create a conversational response
+        const name = emailValidation.nameOnly;
+        const emailKeywords = ['email', 'mail', 'send', 'compose', 'draft', 'write'];
+        const hasEmailKeywords = emailKeywords.some(keyword => input.toLowerCase().includes(keyword));
+        
+        if (hasEmailKeywords) {
+          // Create a template for the pending request
+          const pendingRequest = input.replace(new RegExp(`\\b${name}\\b`, 'gi'), '{EMAIL}');
+          
+          // Store the pending request in context for the next interaction
+          if (!context) context = {};
+          context.pendingEmailRequest = pendingRequest;
+          
+          return `I'd be happy to help you write that email to ${name}! Could you please provide ${name}'s email address?`;
+        }
+        
+        return `I'd be happy to help you compose an email to ${emailValidation.nameOnly}, but I need their email address to proceed. Please provide the complete email address (e.g., "write an email to john@example.com" or "compose email to john.smith@gmail.com").`;
+      }
+      
+      // Process the original request
+      return await this.processEmailRequest(input, context);
+    } catch (error) {
+      console.error('[AIProcessor] Email composition error:', error);
+      return 'I encountered an error while composing your email. Please try again.';
+    }
+  }
+
+  private async processEmailRequest(input: string, context?: any): Promise<string> {
+    if (!this.openaiApiKey && !this.geminiApiKey) {
+      return 'No AI API key configured. Please set OPENAI_API_KEY or GEMINI_API_KEY in your environment variables.';
+    }
+
+    const emailDraft = await this.generateEmailDraft(input, context);
+    const mailtoUrl = this.createMailtoUrl(emailDraft);
+    
+    // Save email draft to database (with error handling)
+    try {
       this.db!.run(
         'INSERT INTO email_drafts (user_prompt, subject, body, recipient, tone, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
         [input, emailDraft.subject, emailDraft.body, emailDraft.recipient || '', emailDraft.tone, Date.now()]
       );
       this.saveToDisk();
-
-      // Open email client with the generated content
-      const mailtoUrl = this.createMailtoUrl(emailDraft);
-      await shell.openExternal(mailtoUrl);
-
-      return `Email draft created and opened in your email client!\n\nSubject: ${emailDraft.subject}\n\nBody:\n${emailDraft.body}`;
-    } catch (error) {
-      console.error('[AIProcessor] Error composing email:', error);
-      return 'I encountered an error while composing your email. Please try again.';
+    } catch (dbError) {
+      console.warn('[AIProcessor] Failed to save email draft to database:', dbError);
+      // Continue with email composition even if database save fails
     }
+    
+    await shell.openExternal(mailtoUrl);
+    return `Email draft created and opened in your default email client. Subject: "${emailDraft.subject}"`;
   }
 
   private async generateEmailDraft(input: string, context?: any): Promise<EmailDraft> {
@@ -225,7 +314,7 @@ export class AIProcessor {
         try {
           response = await this.callGeminiAPI(prompt);
           if (this.debug) console.log('[AIProcessor] Using Gemini API');
-        } catch (error) {
+        } catch (error: any) {
           if (this.debug) console.log('[AIProcessor] Gemini failed, trying OpenAI:', error.message);
           if (this.openaiApiKey) {
             response = await this.callOpenAIAPI(prompt);
@@ -453,6 +542,46 @@ Respond with JSON in this format:
     return 'general';
   }
 
+  private validateEmailAddress(input: string): { hasValidEmail: boolean; emailAddress?: string; nameOnly?: string } {
+    // Email regex pattern
+    const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
+    
+    // Find email addresses in the input
+    const emailMatches = input.match(emailRegex);
+    
+    if (emailMatches && emailMatches.length > 0) {
+      // If the input is just an email address (no other context), it might be a response to a previous prompt
+      const trimmedInput = input.trim();
+      if (trimmedInput === emailMatches[0]) {
+        return { 
+          hasValidEmail: false, 
+          nameOnly: 'email_only',
+          emailAddress: emailMatches[0] 
+        };
+      }
+      return { hasValidEmail: true, emailAddress: emailMatches[0] };
+    }
+    
+    // Check if input contains common email-related words that might indicate a name-only request
+    const emailKeywords = ['email', 'mail', 'send', 'compose', 'draft', 'write', 'to'];
+    const hasEmailKeywords = emailKeywords.some(keyword => input.toLowerCase().includes(keyword));
+    
+    if (hasEmailKeywords) {
+      // Extract potential name (words that could be a name)
+      const words = input.split(/\s+/).filter(word => 
+        word.length > 0 && 
+        !emailKeywords.includes(word.toLowerCase()) &&
+        !['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'].includes(word.toLowerCase())
+      );
+      
+      if (words.length > 0) {
+        return { hasValidEmail: false, nameOnly: words.join(' ') };
+      }
+    }
+    
+    return { hasValidEmail: false };
+  }
+
   private generateAIResponse(input: string, commandResult: any, context?: any): string {
     if (commandResult.success) {
       // Command was executed successfully
@@ -597,15 +726,39 @@ Respond with JSON in this format:
   }
 
   // Email service methods
-  public getEmailHistory(limit: number = 20) {
+  public getEmailHistory(limit: number = 20): any[] {
     return this.emailService.getEmailHistory(limit);
   }
 
-  public clearEmailHistory() {
+  public clearEmailHistory(): void {
     return this.emailService.clearEmailHistory();
   }
 
-  public getEmailConfigurationStatus() {
+  public getEmailConfigurationStatus(): any {
     return this.emailService.getConfigurationStatus();
+  }
+
+  private async ensureWhisperModeInitialized(): Promise<void> {
+    if (process.env.DISABLE_WHISPER_MODE === 'true') {
+      console.log('🎤 Whisper mode disabled by environment variable');
+      return;
+    }
+    
+    if (!this.whisperInitialized) {
+      console.log('🎤 Initializing whisper mode on-demand...');
+      this.whisperInitialized = true;
+    }
+  }
+
+  private async ensureAIProcessorInitialized(): Promise<void> {
+    if (process.env.DISABLE_AI_PROCESSING === 'true') {
+      console.log('🤖 AI processor disabled by environment variable');
+      return;
+    }
+    
+    if (!this.aiProcessorInitialized) {
+      console.log('🤖 Initializing AI processor on-demand...');
+      this.aiProcessorInitialized = true;
+    }
   }
 } 

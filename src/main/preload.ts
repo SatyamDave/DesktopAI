@@ -25,4 +25,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   moveWindow: (x: number, y: number) => ipcRenderer.send('move-window', x, y),
   resizeWindow: (width: number, height: number) => ipcRenderer.send('resize-window', width, height),
   getEmailDraftHistory: (limit?: number) => ipcRenderer.invoke('get-email-draft-history', limit),
+  getConversationHistory: (limit?: number) => ipcRenderer.invoke('get-conversation-history', limit),
+  onOverlayAria: (callback: (event: any, msg: string) => void) => {
+    ipcRenderer.on('overlay-aria', callback);
+  },
+  offOverlayAria: (callback: (event: any, msg: string) => void) => {
+    ipcRenderer.removeListener('overlay-aria', callback);
+  },
+  toggleOverlay: () => ipcRenderer.invoke('toggle-overlay'),
 }); 

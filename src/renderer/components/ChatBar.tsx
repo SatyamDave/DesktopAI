@@ -1,21 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import DatabaseViewer from './DatabaseViewer';
 
 interface ChatBarProps {
   onClose: () => void;
 }
 
-declare global {
-  interface Window {
-    electronAPI: {
-      moveWindow: (x: number, y: number) => void;
-    };
-  }
-}
-
 const ChatBar: React.FC<ChatBarProps> = ({ onClose }) => {
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string; isLoading?: boolean }[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [conversationContext, setConversationContext] = useState<any>({});
+  const [showDatabaseViewer, setShowDatabaseViewer] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -25,13 +21,98 @@ const ChatBar: React.FC<ChatBarProps> = ({ onClose }) => {
     if (inputEl) inputEl.focus();
   }, []);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages((msgs) => [...msgs, { role: 'user', text: input }]);
+  const handleSend = async () => {
+    if (!input.trim() || isProcessing) return;
+    
+    const userMessage = input.trim();
     setInput('');
-    setTimeout(() => {
-      setMessages((msgs) => [...msgs, { role: 'ai', text: 'AI is thinking...' }]);
-    }, 400);
+    setIsProcessing(true);
+    
+    // Add user message to chat
+    setMessages((msgs) => [...msgs, { role: 'user', text: userMessage }]);
+    
+    // Add loading AI message
+    setMessages((msgs) => [...msgs, { role: 'ai', text: 'AI is thinking...', isLoading: true }]);
+    
+    try {
+      console.log(`💬 ChatBar: Sending message to backend: "${userMessage}"`);
+      console.log(`💬 ChatBar: Current context:`, conversationContext);
+      
+      // Send to backend via IPC with context
+      const response = await window.electronAPI?.processAiInput(userMessage, conversationContext);
+      
+      if (response?.success) {
+        // Update context if the AI response indicates a pending request
+        if (response.result && response.result.includes("Could you please provide")) {
+          // Extract the pending request from the AI response
+          const pendingRequest = extractPendingRequest(userMessage);
+          if (pendingRequest) {
+            setConversationContext((prev: any) => ({
+              ...prev,
+              pendingEmailRequest: pendingRequest
+            }));
+          }
+        } else {
+          // Clear context if the request was completed
+          setConversationContext({});
+        }
+        
+        // Replace loading message with AI response
+        setMessages((msgs) => 
+          msgs.map((msg, index) => 
+            index === msgs.length - 1 && msg.isLoading 
+              ? { role: 'ai', text: response.result || 'No response received' }
+              : msg
+          )
+        );
+        console.log(`✅ ChatBar: Received AI response:`, response.result);
+      } else {
+        // Replace loading message with error
+        setMessages((msgs) => 
+          msgs.map((msg, index) => 
+            index === msgs.length - 1 && msg.isLoading 
+              ? { role: 'ai', text: response?.error || 'Failed to get response from AI' }
+              : msg
+          )
+        );
+        console.error(`❌ ChatBar: AI processing failed:`, response?.error);
+      }
+    } catch (error) {
+      console.error('❌ ChatBar: Error sending message to backend:', error);
+      // Replace loading message with error
+      setMessages((msgs) => 
+        msgs.map((msg, index) => 
+          index === msgs.length - 1 && msg.isLoading 
+            ? { role: 'ai', text: 'An error occurred while processing your message.' }
+            : msg
+        )
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Helper function to extract pending email request
+  const extractPendingRequest = (userMessage: string): string | null => {
+    const emailKeywords = ['email', 'mail', 'send', 'compose', 'draft', 'write'];
+    const hasEmailKeywords = emailKeywords.some(keyword => userMessage.toLowerCase().includes(keyword));
+    
+    if (hasEmailKeywords) {
+      // Extract name from the message (simple approach)
+      const words = userMessage.split(/\s+/);
+      const nameIndex = words.findIndex(word => 
+        word.toLowerCase().includes('to') && 
+        words[words.indexOf(word) + 1] && 
+        !emailKeywords.includes(words[words.indexOf(word) + 1].toLowerCase())
+      );
+      
+      if (nameIndex !== -1 && words[nameIndex + 1]) {
+        const name = words[nameIndex + 1];
+        return userMessage.replace(new RegExp(`\\b${name}\\b`, 'gi'), '{EMAIL}');
+      }
+    }
+    
+    return null;
   };
 
   // Drag logic (move window)
@@ -53,66 +134,139 @@ const ChatBar: React.FC<ChatBarProps> = ({ onClose }) => {
   return (
     <motion.div
       ref={barRef}
-      className="fixed bottom-6 right-6 z-[1000] w-[340px] sm:w-[420px] max-w-[98vw] rounded-2xl bg-white/60 dark:bg-gray-900/70 backdrop-blur-md border border-white/30 shadow-2xl flex flex-col pointer-events-auto"
-      initial={{ opacity: 0, scale: 0.8, y: 40 }}
+      initial={{ opacity: 0, scale: 0.95, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.8, y: 40 }}
-      transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+      className="fixed top-4 right-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl rounded-2xl border border-white/20 dark:border-gray-700/30 shadow-2xl w-[480px] h-[600px] flex flex-col overflow-hidden group"
+      style={{ zIndex: 1000 }}
       drag
       dragMomentum={false}
-      dragElastic={0.18}
+      dragElastic={0.1}
       dragConstraints={false}
       onDragStart={handleDragStart}
       onDrag={handleDrag}
-      style={{ touchAction: 'none' }}
-      aria-label="AI Assistant Chat Bar"
-      tabIndex={0}
     >
-      {/* Header with close */}
-      <div className="flex items-center justify-between px-4 pt-3 pb-1">
-        <span className="font-semibold text-lg text-gray-800 dark:text-violet-100 select-none">Doppel Assistant</span>
-        <button
-          onClick={onClose}
-          aria-label="Close chat bar"
-          className="ml-2 p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-violet-400"
-        >
-          <svg className="w-5 h-5 text-gray-500 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-      </div>
-      {/* Chat log */}
-      <div className="flex-1 px-4 pb-2 overflow-y-auto max-h-40">
-        {messages.length === 0 && (
-          <div className="text-gray-400 dark:text-gray-500 text-sm text-center mt-4 select-none">Say hi to your AI assistant!</div>
-        )}
-        {messages.map((msg, i) => (
-          <div key={i} className={`my-1 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <span className={`px-3 py-1 rounded-xl text-sm max-w-[80%] ${msg.role === 'user' ? 'bg-violet-500 text-white' : 'bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-100 border border-violet-100 dark:border-violet-900'}`}>{msg.text}</span>
+      {/* Header with minimal design */}
+      <div className="relative p-4 border-b border-gray-200/50 dark:border-gray-700/50 bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white text-base">Doppel Assistant</h3>
+              <p className="text-gray-500 dark:text-gray-400 text-xs">AI-powered desktop assistant</p>
+            </div>
           </div>
+          <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <button
+              onClick={() => setShowDatabaseViewer(true)}
+              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+              title="View Database"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages with clean styling */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50 dark:bg-gray-900/30">
+        {messages.length === 0 && (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Ask me anything - I'm here to help!</p>
+          </div>
+        )}
+        {messages.map((message, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-[80%] px-4 py-3 rounded-2xl ${
+                message.role === 'user'
+                  ? 'bg-blue-500 text-white shadow-sm'
+                  : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-sm'
+              } ${message.isLoading ? 'animate-pulse' : ''}`}
+            >
+              {message.isLoading && (
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+              )}
+              <p className="text-sm leading-relaxed">{message.text}</p>
+            </div>
+          </motion.div>
         ))}
       </div>
-      {/* Input row */}
-      <form
-        className="flex items-center gap-2 px-4 pb-3 pt-1"
-        onSubmit={e => { e.preventDefault(); handleSend(); }}
-        autoComplete="off"
-      >
-        <input
-          id="chatbar-input"
-          className="flex-1 rounded-lg px-3 py-2 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-400 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm shadow-sm"
-          type="text"
-          placeholder="Type a message..."
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          aria-label="Type a message"
-        />
-        <button
-          type="submit"
-          className="rounded-lg px-4 py-2 bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white font-semibold shadow-md hover:from-violet-600 hover:to-fuchsia-600 focus:outline-none focus:ring-2 focus:ring-violet-400 text-sm"
-          aria-label="Send message"
-        >
-          Send
-        </button>
-      </form>
+
+      {/* Input with minimal design */}
+      <div className="p-4 border-t border-gray-200/50 dark:border-gray-700/50 bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm">
+        <div className="flex space-x-3">
+          <div className="flex-1 relative">
+            <input
+              id="chatbar-input"
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Type your message..."
+              className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200 text-sm"
+              disabled={isProcessing}
+            />
+            {isProcessing && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || isProcessing}
+            className="px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-2 text-sm"
+          >
+            {isProcessing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                <span>...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+                <span>Send</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Database Viewer Modal */}
+      {showDatabaseViewer && (
+        <DatabaseViewer onClose={() => setShowDatabaseViewer(false)} />
+      )}
     </motion.div>
   );
 };

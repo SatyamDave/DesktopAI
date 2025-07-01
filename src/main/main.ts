@@ -19,6 +19,10 @@ import { ConfigManager } from './services/ConfigManager';
 import { PerformanceOptimizer } from './services/PerformanceOptimizer';
 import { DatabaseManager } from './services/DatabaseManager';
 
+// Overlay window variables must be at the top level, not inside the class
+let overlayWin: BrowserWindow | null = null;
+let overlayBackdrop: BrowserWindow | null = null;
+
 class DoppelApp {
   private mainWindow: BrowserWindow | null = null;
   private floatingWindow: BrowserWindow | null = null;
@@ -71,6 +75,8 @@ class DoppelApp {
       console.log('✅ IPC setup complete');
       this.setupPerformanceMonitoring();
       console.log('✅ Performance monitoring setup');
+      this.createOverlayWindow();
+      console.log('✅ Overlay window created');
       console.log('🎉 App initialization complete!');
     });
 
@@ -400,7 +406,6 @@ class DoppelApp {
     try {
       // Cmd/Ctrl + Shift + . to open command input
       const shortcut = process.platform === 'darwin' ? 'Command+Shift+.' : 'Control+Shift+.';
-      
       globalShortcut.register(shortcut, () => {
         this.showCommandInput();
       });
@@ -416,6 +421,24 @@ class DoppelApp {
       const whisperShortcut = process.platform === 'darwin' ? 'Command+Shift+W' : 'Control+Shift+W';
       globalShortcut.register(whisperShortcut, () => {
         this.toggleWhisperMode();
+      });
+
+      // --- NEW: Cmd/Ctrl+H to toggle overlay ---
+      const overlayShortcut = process.platform === 'darwin' ? 'Command+H' : 'Control+H';
+      globalShortcut.register(overlayShortcut, () => {
+        if (overlayWin) {
+          if (overlayWin.isVisible()) {
+            overlayWin.hide();
+            overlayBackdrop?.hide();
+          } else {
+            const { width, height } = overlayWin.getBounds();
+            const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
+            overlayWin.setPosition(Math.round((sw - width) / 2), Math.round((sh - height) / 4));
+            overlayBackdrop?.showInactive();
+            overlayWin.showInactive();
+            overlayWin.webContents.send('overlay-aria', 'opened');
+          }
+        }
       });
 
       console.log('✅ Global shortcuts registered successfully');
@@ -690,11 +713,40 @@ class DoppelApp {
     // Handle email draft history
     ipcMain.handle('get-email-draft-history', async (event, limit = 20) => {
       try {
+        await this.ensureAIProcessorInitialized();
         const history = await this.aiProcessor.getEmailDraftHistory(limit);
         return { success: true, history };
       } catch (error) {
         console.error('❌ Error getting email draft history:', error);
         return { success: false, error: (error as Error).message, history: [] };
+      }
+    });
+
+    // Handle conversation history
+    ipcMain.handle('get-conversation-history', async (event, limit = 20) => {
+      try {
+        await this.ensureAIProcessorInitialized();
+        const history = await this.aiProcessor.getConversationHistory(limit);
+        return { success: true, history };
+      } catch (error) {
+        console.error('❌ Error getting conversation history:', error);
+        return { success: false, error: (error as Error).message, history: [] };
+      }
+    });
+
+    // Handle overlay
+    ipcMain.handle('toggle-overlay', () => {
+      if (!overlayWin) return;
+      if (overlayWin.isVisible()) {
+        overlayWin.hide();
+        overlayWin.setFocusable(false);
+      } else {
+        overlayWin.setFocusable(true);
+        const { width, height } = overlayWin.getBounds();
+        const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
+        overlayWin.setPosition(Math.round((sw - width) / 2), Math.round((sh - height) / 4));
+        overlayWin.show();
+        overlayWin.webContents.send('overlay-aria', 'opened');
       }
     });
   }
@@ -803,6 +855,40 @@ class DoppelApp {
     } catch (error) {
       console.error('❌ Error during emergency shutdown:', error);
       process.exit(1);
+    }
+  }
+
+  private createOverlayWindow() {
+    if (!overlayWin) {
+      overlayWin = new BrowserWindow({
+        width: 440,
+        height: 72,
+        frame: false,
+        transparent: true,
+        backgroundColor: '#00000000',
+        resizable: false,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        show: false,
+        focusable: true,
+        fullscreenable: false,
+        webPreferences: {
+          devTools: true,
+          nodeIntegration: true,
+          contextIsolation: false,
+          preload: __dirname + '/preload.js',
+        },
+      });
+      overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      overlayWin.setIgnoreMouseEvents(false);
+      const url = this.isDev
+        ? 'http://localhost:3000/overlay'
+        : `file://${path.join(__dirname, '../renderer/index.html')}?overlay`;
+      overlayWin.loadURL(url);
+      overlayWin.on('blur', () => {
+        overlayWin?.hide();
+        overlayWin?.webContents.send('overlay-aria', 'closed');
+      });
     }
   }
 }

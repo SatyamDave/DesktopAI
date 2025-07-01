@@ -4,15 +4,6 @@ import ChatBar from './components/ChatBar';
 import { AnimatePresence } from 'framer-motion';
 import './index.css';
 
-declare global {
-  interface Window {
-    electronAPI: {
-      moveWindow: (x: number, y: number) => void;
-      resizeWindow: (width: number, height: number) => void;
-    };
-  }
-}
-
 console.log('🚀 Renderer App.tsx loading...');
 
 function App() {
@@ -65,7 +56,7 @@ function App() {
     <div className="app">
       <AnimatePresence>
         {!showChatBar && (
-          <FloatingOrb key="orb" isUltraLightweight={isUltraLightweight} emergencyMode={emergencyMode} onClick={() => setShowChatBar(true)} />
+          <FloatingOrb key="orb" onClick={() => setShowChatBar(true)} />
         )}
         {showChatBar && (
           <ChatBar key="chatbar" onClose={() => setShowChatBar(false)} />

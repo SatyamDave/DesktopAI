@@ -17,6 +17,9 @@ declare global {
       }>;
       toggleWhisperMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
       getAppStatus: () => Promise<{ success: boolean; status?: any; error?: string }>;
+      // Window management methods
+      moveWindow: (x: number, y: number) => void;
+      resizeWindow: (width: number, height: number) => void;
       // Performance monitoring methods
       getPerformanceMetrics: () => Promise<{ 
         success: boolean; 
@@ -44,6 +47,11 @@ declare global {
       // Listen for emergency mode events
       onEmergencyMode: (callback: (isEmergency: boolean) => void) => void;
       getEmailDraftHistory: (limit?: number) => Promise<{ success: boolean; history?: any[]; error?: string }>;
+      getConversationHistory: (limit?: number) => Promise<{ success: boolean; history?: any[]; error?: string }>;
+      // Overlay methods
+      onOverlayAria: (callback: (event: any, msg: string) => void) => void;
+      offOverlayAria: (callback: (event: any, msg: string) => void) => void;
+      toggleOverlay: () => Promise<void>;
     };
   }
 }
