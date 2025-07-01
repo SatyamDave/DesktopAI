@@ -99,7 +99,7 @@ function createFloatingWindow() {
 
     // Load the regular React-based orb overlay
     const orbUrl = isDev
-      ? 'http://localhost:3003/orb'
+      ? 'http://localhost:3000/orb'
       : `file://${path.join(__dirname, '../renderer/index.html')}?orb`;
 
     console.log(`🚀 Loading orb overlay: ${orbUrl}`);
