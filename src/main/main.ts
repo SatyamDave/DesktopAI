@@ -2,22 +2,23 @@ import * as path from 'path';
 import * as dotenv from 'dotenv';
 console.log('Loading .env from:', path.resolve(__dirname, '../../.env'));
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+// Simplified environment logging
 console.log('DEBUG ENV:', {
-  AZURE_OPENAI_API_KEY: process.env.AZURE_OPENAI_API_KEY,
-  AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
-  AZURE_OPENAI_DEPLOYMENT_NAME: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
-  AZURE_OPENAI_API_VERSION: process.env.AZURE_OPENAI_API_VERSION,
-  TEST_ENV_VAR: process.env.TEST_ENV_VAR,
+  NODE_ENV: process.env.NODE_ENV,
+  ULTRA_LIGHTWEIGHT: process.env.ULTRA_LIGHTWEIGHT,
+  DEBUG_MODE: process.env.DEBUG_MODE,
 });
+
 import { app, BrowserWindow, globalShortcut, ipcMain, screen, Tray, Menu, nativeImage } from 'electron';
-import { ClipboardManager } from './services/ClipboardManager';
-import { BehaviorTracker } from './services/BehaviorTracker';
-import { AIProcessor } from './services/AIProcessor';
-import { WhisperMode } from './services/WhisperMode';
-import { CommandExecutor } from './services/CommandExecutor';
+// Lightweight imports only
 import { ConfigManager } from './services/ConfigManager';
-import { PerformanceOptimizer } from './services/PerformanceOptimizer';
-import { DatabaseManager } from './services/DatabaseManager';
+import { ScreenPerception } from './services/ScreenPerception';
+import { AudioPerception } from './services/AudioPerception';
+import { ContextManager } from './services/ContextManager';
+import { DELOCommandSystem } from './services/DELOCommandSystem';
+
+app.disableHardwareAcceleration();
 
 // Overlay window variables must be at the top level, not inside the class
 let overlayWin: BrowserWindow | null = null;
@@ -27,31 +28,29 @@ class DoppelApp {
   private mainWindow: BrowserWindow | null = null;
   private floatingWindow: BrowserWindow | null = null;
   private tray: Tray | null = null;
-  private clipboardManager: ClipboardManager;
-  private behaviorTracker: BehaviorTracker;
-  private aiProcessor: AIProcessor;
-  private whisperMode: WhisperMode;
-  private commandExecutor: CommandExecutor;
-  private performanceOptimizer: PerformanceOptimizer;
-  private databaseManager: DatabaseManager;
   private isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-
-  // Lazy initialization methods
+  
+  // Service initialization flags
   private databaseInitialized = false;
   private clipboardInitialized = false;
   private behaviorInitialized = false;
   private whisperInitialized = false;
   private aiProcessorInitialized = false;
+  
+  // Service instances (lazy loaded)
+  private databaseManager: any = null;
+  private clipboardManager: any = null;
+  private behaviorTracker: any = null;
+  private whisperMode: any = null;
+  private aiProcessor: any = null;
+  private screenPerception: any = null;
+  private audioPerception: any = null;
+  private contextManager: any = null;
+  private deloCommandSystem: any = null;
+  private performanceOptimizer: any = null;
+  private commandExecutor: any = null;
 
   constructor() {
-    this.performanceOptimizer = PerformanceOptimizer.getInstance();
-    this.databaseManager = DatabaseManager.getInstance();
-    this.clipboardManager = new ClipboardManager();
-    this.behaviorTracker = new BehaviorTracker();
-    this.aiProcessor = new AIProcessor();
-    this.whisperMode = new WhisperMode();
-    this.commandExecutor = new CommandExecutor();
-    
     console.log(`🔧 Development mode: ${this.isDev}`);
     console.log(`📦 App packaged: ${app.isPackaged}`);
     
@@ -105,55 +104,15 @@ class DoppelApp {
     try {
       console.log('🚀 Initializing services in ULTRA-LIGHTWEIGHT mode...');
       
-      // Check for ultra-lightweight mode environment variables
-      const isUltraLightweight = process.env.ULTRA_LIGHTWEIGHT === 'true';
-      const disableClipboard = process.env.DISABLE_CLIPBOARD_TRACKING === 'true';
-      const disableBehavior = process.env.DISABLE_BEHAVIOR_TRACKING === 'true';
-      const disableWhisper = process.env.DISABLE_WHISPER_MODE === 'true';
-      const disableAI = process.env.DISABLE_AI_PROCESSING === 'true';
-      const disablePerformanceMonitoring = process.env.DISABLE_PERFORMANCE_MONITORING === 'true';
-      const disableDatabase = process.env.DISABLE_DATABASE === 'true';
-      
-      if (isUltraLightweight) {
-        console.log('⚡ ULTRA-LIGHTWEIGHT MODE DETECTED - Disabling all heavy services');
-        console.log('📋 Clipboard tracking: DISABLED');
-        console.log('👁️ Behavior tracking: DISABLED');
-        console.log('🎤 Whisper mode: DISABLED');
-        console.log('🤖 AI processing: DISABLED');
-        if (disablePerformanceMonitoring) {
-          console.log('🔍 Performance monitoring: DISABLED');
-        }
-        if (disableDatabase) {
-          console.log('🗄️ Database: DISABLED');
-        }
-      }
-      
-      // Initialize performance monitoring with very long interval
-      const monitoringInterval = parseInt(process.env.PERFORMANCE_MONITORING_INTERVAL || '60000');
-      console.log(`🔍 Starting performance monitoring (interval: ${monitoringInterval}ms)...`);
-      
-      // Skip performance monitoring in ultra-lightweight mode to prevent lag
-      if (!isUltraLightweight && !disablePerformanceMonitoring) {
-        this.performanceOptimizer.startMonitoring(monitoringInterval);
-      } else {
-        console.log('⚡ Ultra-lightweight mode: Performance monitoring disabled');
-      }
-      
-      // Initialize database manager only when needed
-      if (!disableDatabase) {
-        console.log('🗄️ Database manager will be initialized on-demand...');
-      } else {
-        console.log('🗄️ Database manager: DISABLED');
-      }
-      
-      // Initialize only the most essential services
-      console.log('🤖 Initializing only essential services...');
-      
-      // Don't initialize heavy services at startup - they'll be initialized on-demand
-      console.log('⚡ ULTRA-LIGHTWEIGHT MODE: Skipping all heavy services at startup');
-      console.log('📋 Clipboard manager: Will initialize on first use');
-      console.log('👁️ Behavior tracker: Will initialize on first use');
-      console.log('🎤 Whisper mode: Will initialize on first use');
+      // Skip all heavy service initialization to prevent memory issues
+      console.log('⚡ ULTRA-LIGHTWEIGHT MODE: Skipping all heavy services');
+      console.log('📋 Clipboard tracking: DISABLED');
+      console.log('👁️ Behavior tracking: DISABLED');
+      console.log('🎤 Whisper mode: DISABLED');
+      console.log('🤖 AI processing: DISABLED');
+      console.log('🔍 Performance monitoring: DISABLED');
+      console.log('🗄️ Database: DISABLED');
+      console.log('🖥️ System Control: DISABLED');
       
       console.log('✅ Services initialized in ultra-lightweight mode');
     } catch (error) {
@@ -226,6 +185,39 @@ class DoppelApp {
       console.log('🤖 Initializing AI processor on-demand...');
       await this.aiProcessor.init();
       this.aiProcessorInitialized = true;
+    }
+  }
+
+  // Lazy initialization methods for heavy services
+  private async ensureScreenPerceptionInitialized(): Promise<void> {
+    if (!this.screenPerception) {
+      console.log('📸 Initializing ScreenPerception on-demand...');
+      this.screenPerception = new ScreenPerception();
+      await this.screenPerception.init();
+    }
+  }
+
+  private async ensureAudioPerceptionInitialized(): Promise<void> {
+    if (!this.audioPerception) {
+      console.log('🎵 Initializing AudioPerception on-demand...');
+      this.audioPerception = new AudioPerception();
+      await this.audioPerception.init();
+    }
+  }
+
+  private async ensureContextManagerInitialized(): Promise<void> {
+    if (!this.contextManager) {
+      console.log('🧠 Initializing ContextManager on-demand...');
+      this.contextManager = new ContextManager();
+      await this.contextManager.init();
+    }
+  }
+
+  private async ensureDeloCommandSystemInitialized(): Promise<void> {
+    if (!this.deloCommandSystem) {
+      console.log('🧠 Initializing DELOCommandSystem on-demand...');
+      this.deloCommandSystem = new DELOCommandSystem();
+      await this.deloCommandSystem.initialize();
     }
   }
 
@@ -351,11 +343,21 @@ class DoppelApp {
     try {
       console.log('🪟 Creating floating orb window...');
       
+      // Get screen dimensions for better positioning
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+      
+      // Make the window larger to ensure the orb is visible
+      const orbSize = 120; // Increased from 80 to 120
+      const margin = 30; // Increased margin
+      const x = screenWidth - orbSize - margin;
+      const y = screenHeight - orbSize - margin;
+      
       this.floatingWindow = new BrowserWindow({
-        width: 100,
-        height: 100,
-        x: 100,
-        y: 100,
+        width: orbSize,
+        height: orbSize,
+        x: x,
+        y: y,
         frame: false,
         transparent: true,
         alwaysOnTop: true,
@@ -363,32 +365,44 @@ class DoppelApp {
         resizable: false,
         minimizable: false,
         maximizable: false,
-        show: true,
+        show: false, // Don't show until ready
+        titleBarStyle: 'hidden',
         webPreferences: {
           preload: path.join(__dirname, 'preload.js'),
           contextIsolation: true,
-          nodeIntegration: false
+          nodeIntegration: false,
+          webSecurity: false
         }
       });
 
-      const url = this.isDev ? 'http://localhost:3000' : `file://${path.join(__dirname, '../renderer/index.html')}`;
+      // Use the correct port that Vite is running on (3005)
+      const url = this.isDev ? 'http://localhost:3005?orb=true' : `file://${path.join(__dirname, '../renderer/index.html')}?orb=true`;
       console.log(`🚀 Loading URL: ${url}`);
       
       this.floatingWindow.loadURL(url);
 
       this.floatingWindow.on('ready-to-show', () => {
         console.log('✅ Orb window ready to show');
+        this.floatingWindow?.show();
         this.floatingWindow?.focus();
       });
 
       this.floatingWindow.webContents.on('did-finish-load', () => {
         console.log('✅ Orb page finished loading');
-        this.floatingWindow?.show();
-        this.floatingWindow?.focus();
+        // Small delay to ensure everything is ready
+        setTimeout(() => {
+          this.floatingWindow?.show();
+          this.floatingWindow?.focus();
+        }, 500);
       });
 
       this.floatingWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
         console.error(`❌ Failed to load ${validatedURL}: ${errorDescription}`);
+        // Retry loading after a short delay
+        setTimeout(() => {
+          console.log('🔄 Retrying to load orb window...');
+          this.floatingWindow?.loadURL(url);
+        }, 2000);
       });
 
       this.floatingWindow.on('close', (event) => {
@@ -457,8 +471,14 @@ class DoppelApp {
         const lowerCommand = command.toLowerCase();
         if (lowerCommand.includes('email') || lowerCommand.includes('mail') || lowerCommand.includes('send') || 
             lowerCommand.includes('compose') || lowerCommand.includes('draft')) {
-          console.log(`📧 Email composition detected, routing to AIProcessor`);
+          console.log(`📧 Email composition detected, routing to AIProcessor for draft generation`);
+          // Always use AI to generate the draft first
           const result = await this.aiProcessor.processInput(command);
+          if (typeof result === 'string' && result.startsWith('❌')) {
+            // AI failed, return error, do NOT open browser
+            return { success: false, result, data: { type: 'email_composition', error: true } };
+          }
+          // If successful, result contains the draft and the mailto link is opened by EmailService
           return { success: true, result, data: { type: 'email_composition' } };
         }
         
@@ -471,6 +491,46 @@ class DoppelApp {
         return { success: false, error: (error as Error).message };
       }
     });
+
+    // Handle DELO command processing - TEMPORARILY DISABLED
+    /*
+    ipcMain.handle('process-delo-command', async (event, command: string) => {
+      await this.ensureDeloCommandSystemInitialized();
+      try {
+        const result = await this.deloCommandSystem!.processCommand(command);
+        return { success: result.success, ...result };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    });
+    */
+
+    // Handle DELO suggestions - TEMPORARILY DISABLED
+    /*
+    ipcMain.handle('get-delo-suggestions', async (event) => {
+      try {
+        const context = await DELOCommandSystem['getCurrentContext']();
+        const suggestions = DELOCommandSystem.getSuggestions(context);
+        return { success: true, suggestions };
+      } catch (error) {
+        console.error('❌ Error getting DELO suggestions:', error);
+        return { success: false, error: (error as Error).message, suggestions: [] };
+      }
+    });
+    */
+
+    // Handle DELO session insights - TEMPORARILY DISABLED
+    /*
+    ipcMain.handle('get-delo-insights', async (event) => {
+      try {
+        const insights = DELOCommandSystem.getSessionInsights();
+        return { success: true, insights };
+      } catch (error) {
+        console.error('❌ Error getting DELO insights:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+    */
 
     // Handle AI processing
     ipcMain.handle('process-ai-input', async (event, input: string, context?: any) => {
@@ -828,7 +888,7 @@ class DoppelApp {
   }
 
   private async emergencyShutdown() {
-    console.log('🚨 EMERGENCY SHUTDOWN INITIATED');
+    console.log('🛑 EMERGENCY SHUTDOWN INITIATED');
     
     try {
       // Stop performance monitoring immediately

@@ -1,15 +1,37 @@
-# Doppel - AI Desktop Assistant
+# Doppel - High-Efficiency Real-Time AI Desktop Assistant
 
-A powerful, intelligent desktop assistant that automates your daily tasks with natural language commands. Built with Electron, React, and TypeScript.
+A powerful, intelligent desktop assistant that runs locally with minimal latency and provides real-time system control capabilities. Built with Electron, React, TypeScript, and local AI models.
 
 ![Doppel AI Assistant](https://img.shields.io/badge/Doppel-AI%20Assistant-blue?style=for-the-badge)
 ![Electron](https://img.shields.io/badge/Electron-27.1.3-47848F?style=for-the-badge&logo=electron)
 ![React](https://img.shields.io/badge/React-18.2.0-61DAFB?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-3178C6?style=for-the-badge&logo=typescript)
+![Local AI](https://img.shields.io/badge/Local%20AI-Ollama%20%7C%20Transformers-green?style=for-the-badge)
 
 ## 🚀 Features
 
-### Core Automation
+### 🤖 Real-Time AI Processing
+- **Local LLM Support**: Ollama (Phi, Mistral, Llama2) + Transformers.js
+- **Intent Recognition**: Natural language command interpretation
+- **Action Routing**: Automatic command-to-action mapping
+- **Confidence Scoring**: AI confidence levels for execution
+- **Response Caching**: Intelligent caching for faster execution
+
+### 🖥️ System Control & Automation
+- **Real-time System Monitoring**: CPU, memory, disk, processes
+- **Window Management**: Active window detection and control
+- **Input Automation**: Mouse, keyboard, clipboard control
+- **Application Launching**: Smart app detection across platforms
+- **Screenshot & OCR**: Screen capture with text extraction
+
+### ⚡ High-Performance Interface
+- **GPU-Accelerated Overlay**: Smooth animations and effects
+- **Minimal Latency**: Optimized for real-time interaction
+- **Global Hotkeys**: Ctrl+K (focus), Ctrl+L (voice), Esc (close)
+- **Voice Commands**: Integrated voice recognition
+- **Auto Mode**: Execute commands without confirmation
+
+### 🎯 Core Automation
 - **App Launcher**: Open applications with natural language commands
 - **Web Search**: Search Google and YouTube with voice/text commands
 - **Email Drafting**: Compose emails with smart templates
@@ -17,19 +39,21 @@ A powerful, intelligent desktop assistant that automates your daily tasks with n
 - **Smart Suggestions**: AI-powered autocomplete for commands
 - **Sequential Execution**: Run multiple commands in sequence
 
-### User Interface
+### 🎨 User Interface
 - **Floating Orb**: Beautiful, always-on-top interface with glassmorphism effects
-- **Global Shortcuts**: Quick access with keyboard shortcuts
-- **Command Input**: Modal interface for typing commands
-- **Toast Notifications**: Real-time feedback for actions
+- **Real-Time Overlay**: High-performance command interface
+- **System Status Display**: Real-time performance metrics
+- **Settings Panel**: Easy configuration and customization
 - **Responsive Design**: Works across different screen sizes
 
-### Advanced Features
+### 🔧 Advanced Features
 - **Clipboard Manager**: Track and manage clipboard history
 - **Behavior Tracking**: Monitor app usage patterns
 - **Whisper Mode**: Voice recognition for hands-free operation
 - **Database Persistence**: Local storage for all data
 - **Cross-Platform**: Works on Windows, macOS, and Linux
+- **Plugin System**: Extensible action handlers
+- **Performance Optimization**: Multi-threading and caching
 
 ## 🎯 Quick Start
 
@@ -42,6 +66,12 @@ cd doppel
 
 # Install dependencies
 npm install
+
+# Install Ollama (optional, for local LLM)
+npm run install:ollama
+
+# Pull AI models
+npm run pull:models
 
 # Start development server
 npm run dev
@@ -57,6 +87,18 @@ The application is designed to run as a desktop application using Electron. Here
 npm run dev
 ```
 
+#### Ultra-Lightweight Mode (Low Performance)
+```bash
+# Run with minimal services for older hardware
+npm run start:laptop-safe
+```
+
+#### Emergency Mode (Very Low Performance)
+```bash
+# Run with emergency optimizations
+npm run start:emergency
+```
+
 #### Production Mode (Desktop)
 ```bash
 # Build the application first
@@ -69,22 +111,42 @@ npx electron .
 run-desktop.bat
 ```
 
-#### Web Development Mode (Browser)
-If you want to run it in a browser for web development:
-```bash
-# Run only the renderer process (Vite dev server)
-npm run dev:renderer
-```
+### Testing the Real-Time AI Assistant
 
-**Note**: The application is primarily designed as a desktop application. Running it in a browser will limit some features like global shortcuts, system integration, and native desktop capabilities.
+```bash
+# Run the test suite
+node test-realtime-ai.js
+
+# Start Ollama server (optional)
+npm run start:ollama
+
+# In another terminal, pull models
+ollama pull phi
+ollama pull mistral
+ollama pull llama2
+```
 
 ### Usage
 
 1. **Launch Doppel**: The floating orb will appear on your screen
-2. **Open Command Input**: Press `Ctrl+Shift+.` (or `Cmd+Shift+.` on Mac)
+2. **Open Real-Time Overlay**: Press `Ctrl+K` or click the orb
 3. **Type Commands**: Use natural language to control your computer
+4. **Voice Commands**: Press `Ctrl+L` to toggle voice listening
+5. **Auto Mode**: Enable in settings for instant execution
 
 ## 📝 Command Examples
+
+### Real-Time System Control
+```bash
+"Open Chrome"           # Launches Google Chrome
+"Take a screenshot"     # Captures screen with OCR
+"Search for AI news"    # Opens web search
+"Write an email"        # Opens email composition
+"Copy to clipboard"     # Manages clipboard
+"Lock my computer"      # System control
+"Move mouse to center"  # Mouse automation
+"Type hello world"      # Keyboard automation
+```
 
 ### App Launching
 ```bash
@@ -120,6 +182,30 @@ npm run dev:renderer
 
 ### Core Services
 
+#### LocalLLMService (`src/main/services/LocalLLMService.ts`)
+- Local AI processing with Ollama and Transformers.js
+- Multiple model support (Phi, Mistral, Llama2)
+- Intelligent response caching
+- Confidence scoring and intent detection
+
+#### SystemControlService (`src/main/services/SystemControlService.ts`)
+- Real-time system monitoring and control
+- Window management and input automation
+- Screenshot capture with OCR
+- Process management and application launching
+
+#### RealTimeCommandProcessor (`src/main/services/RealTimeCommandProcessor.ts`)
+- Orchestrates all services for command execution
+- Command queue management
+- Modular action handler system
+- Context gathering and error handling
+
+#### RealTimeOverlay (`src/renderer/components/RealTimeOverlay.tsx`)
+- High-performance overlay interface
+- GPU-accelerated animations
+- Real-time status display
+- Voice control integration
+
 #### CommandExecutor (`src/main/services/CommandExecutor.ts`)
 - Handles all command execution with error handling
 - Manages app configurations for different platforms
@@ -132,21 +218,6 @@ npm run dev:renderer
 - Integrates with CommandExecutor for execution
 - Maintains conversation history
 
-#### ClipboardManager (`src/main/services/ClipboardManager.ts`)
-- Tracks clipboard history automatically
-- Provides search functionality
-- Manages clipboard data persistence
-
-#### BehaviorTracker (`src/main/services/BehaviorTracker.ts`)
-- Monitors application usage patterns
-- Tracks user behavior for context
-- Provides insights for better suggestions
-
-#### WhisperMode (`src/main/services/WhisperMode.ts`)
-- Handles voice recognition (simulated)
-- Manages voice-to-text conversion
-- Provides voice command support
-
 ### Frontend Components
 
 #### FloatingOrb (`src/renderer/components/FloatingOrb.tsx`)
@@ -155,17 +226,11 @@ npm run dev:renderer
 - Real-time user context display
 - Quick action buttons
 
-#### CommandInput (`src/renderer/components/CommandInput.tsx`)
-- Modal command input interface
-- Autocomplete suggestions
-- Command history display
-- Toast notifications
-
-#### FeatureTest (`src/renderer/components/FeatureTest.tsx`)
-- Comprehensive test suite
-- Real-time feature validation
-- Performance metrics
-- Error reporting
+#### RealTimeOverlay (`src/renderer/components/RealTimeOverlay.tsx`)
+- High-performance command interface
+- GPU-accelerated background effects
+- Voice control integration
+- System status monitoring
 
 ## 🎨 UI/UX Features
 
@@ -175,26 +240,28 @@ npm run dev:renderer
 - Responsive hover states
 - Modern gradient backgrounds
 
+### Real-Time Performance
+- GPU-accelerated canvas animations
+- Minimal latency command processing
+- Efficient state management
+- Optimized rendering pipeline
+
 ### Accessibility
 - Keyboard navigation support
 - Screen reader compatibility
 - High contrast mode support
 - Focus management
 
-### Performance
-- Lazy loading of components
-- Efficient state management
-- Optimized animations
-- Minimal resource usage
-
 ## 🔑 Global Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Shift+.` | Open command input |
-| `Escape` | Hide floating window |
+| `Ctrl+K` | Open real-time overlay |
+| `Ctrl+L` | Toggle voice listening |
+| `Ctrl+↑/↓` | Navigate command history |
+| `Escape` | Close overlay |
+| `Ctrl+Shift+.` | Open command input (legacy) |
 | `Ctrl+Shift+W` | Toggle whisper mode |
-| `Ctrl+Shift+V` | Voice paste (whisper mode) |
 
 ## 🗄️ Data Storage
 

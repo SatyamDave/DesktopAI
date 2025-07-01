@@ -1,12 +1,25 @@
-import initSqlJs from 'sql.js';
-import type { Database, SqlJsStatic } from 'sql.js';
+// Optional sql.js import
+let initSqlJs: any = null;
+let Database: any = null;
+let SqlJsStatic: any = null;
+
+try {
+  const sqlJs = require('sql.js');
+  initSqlJs = sqlJs.default || sqlJs;
+  Database = sqlJs.Database;
+  SqlJsStatic = sqlJs.SqlJsStatic;
+} catch (error) {
+  console.warn('⚠️ sql.js not available - database features will be disabled');
+}
+
+import { configManager } from './ConfigManager';
+import { DatabaseManager } from './DatabaseManager';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import axios from 'axios';
 import { shell } from 'electron';
-import { CommandExecutor } from './CommandExecutor';
-import { ConfigManager } from './ConfigManager';
+import { agenticCommandProcessor } from './AgenticCommandProcessor';
 import { EmailService } from './EmailService';
 
 interface Conversation {
@@ -36,38 +49,54 @@ interface EmailDraft {
 }
 
 export class AIProcessor {
-  private db: Database | null = null;
-  private sqlJS: SqlJsStatic | null = null;
+  private db: any = null;
+  private sqlJs: any = null;
   private dbPath: string;
   private commands: Map<string, Command> = new Map();
-  private commandExecutor: CommandExecutor;
-  private configManager: ConfigManager;
+  private agenticCommandProcessor: typeof agenticCommandProcessor;
+  private configManager: typeof configManager;
   private emailService: EmailService;
   private debug: boolean;
   private openaiApiKey: string | null = null;
   private openaiEndpoint: string | null = null;
   private openaiDeployment: string | null = null;
   private geminiApiKey: string | null = null;
+<<<<<<< HEAD
   private aiProcessorInitialized: boolean = false;
   private whisperInitialized: boolean = false;
   private whisperMode: any; // Assuming whisperMode is defined elsewhere in the file
+=======
+  private azureOpenaiKey: string | null = null;
+  private azureOpenaiEndpoint: string | null = null;
+  private azureOpenaiDeployment: string | null = null;
+  private azureOpenaiApiVersion: string | null = null;
+  private databaseManager: DatabaseManager;
+  private conversationHistory: Conversation[] = [];
+  private maxHistoryLength = 50;
+  private isInitialized = false;
+>>>>>>> origin/main
 
   constructor() {
-    this.configManager = new ConfigManager();
+    this.agenticCommandProcessor = agenticCommandProcessor;
+    this.emailService = new EmailService();
+    this.configManager = configManager;
+    this.databaseManager = DatabaseManager.getInstance();
     this.debug = this.configManager.isDebugMode();
     const dbDir = path.join(os.homedir(), '.doppel');
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
     }
     this.dbPath = path.join(dbDir, 'ai.sqlite');
-    this.commandExecutor = new CommandExecutor();
-    this.emailService = new EmailService();
     
     // Load AI configuration
     this.openaiApiKey = process.env.AZURE_OPENAI_API_KEY || process.env.OPENAI_API_KEY || null;
     this.openaiEndpoint = process.env.AZURE_OPENAI_ENDPOINT || null;
     this.openaiDeployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || null;
     this.geminiApiKey = process.env.GEMINI_API_KEY || null;
+    this.azureOpenaiKey = process.env.AZURE_OPENAI_API_KEY || null;
+    this.azureOpenaiEndpoint = process.env.AZURE_OPENAI_ENDPOINT || null;
+    this.azureOpenaiDeployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || null;
+    this.azureOpenaiApiVersion = process.env.AZURE_OPENAI_API_VERSION || null;
     
     if (this.debug) {
       console.log('[AIProcessor] AI Configuration:', {
@@ -75,20 +104,27 @@ export class AIProcessor {
         hasOpenAIEndpoint: !!this.openaiEndpoint,
         hasOpenAIDeployment: !!this.openaiDeployment,
         hasGeminiKey: !!this.geminiApiKey,
-        apiVersion: process.env.AZURE_OPENAI_API_VERSION
+        hasAzureOpenAIKey: !!this.azureOpenaiKey,
+        hasAzureOpenAIEndpoint: !!this.azureOpenaiEndpoint,
+        hasAzureOpenAIDeployment: !!this.azureOpenaiDeployment,
+        apiVersion: this.azureOpenaiApiVersion
       });
     }
   }
 
   public async init() {
-    this.sqlJS = await initSqlJs();
+    this.sqlJs = await initSqlJs();
     if (fs.existsSync(this.dbPath)) {
       const filebuffer = fs.readFileSync(this.dbPath);
+<<<<<<< HEAD
       this.db = new this.sqlJS.Database(filebuffer);
       // Ensure tables exist even in existing database
       this.initializeDatabase();
+=======
+      this.db = new this.sqlJs.Database(filebuffer);
+>>>>>>> origin/main
     } else {
-      this.db = new this.sqlJS.Database();
+      this.db = new this.sqlJs.Database();
       this.initializeDatabase();
       this.saveToDisk();
     }
@@ -204,22 +240,21 @@ export class AIProcessor {
         intent: intent
       };
       
-      // Use CommandExecutor for actual command execution
-      const commandResult = await this.commandExecutor.executeCommand(input);
-      // Generate AI response based on command result
-      const response = this.generateAIResponse(input, commandResult, context);
-      conversation.ai_response = response;
+      // Use AgenticCommandProcessor for command execution
+      const commandResult = await this.agenticCommandProcessor.processCommand(input);
       
-      // Save conversation to database
-      this.db!.run(
-        'INSERT INTO conversations (user_input, ai_response, timestamp, context, intent) VALUES (?, ?, ?, ?, ?)',
-        [conversation.user_input, conversation.ai_response, conversation.timestamp, conversation.context, conversation.intent]
-      );
-      this.saveToDisk();
-      if (this.debug) console.log(`[AIProcessor] Command processed: success=${commandResult.success}`);
-      return response;
+      // Generate AI response based on command result
+      const aiResponse = this.generateAIResponse(input, commandResult);
+      conversation.ai_response = aiResponse;
+      
+      // Save conversation
+      await this.saveConversation(conversation);
+      
+      return aiResponse;
+      
     } catch (error) {
       console.error('[AIProcessor] Error processing input:', error);
+<<<<<<< HEAD
       return 'I apologize, but I encountered an error processing your request. Please try again.';
     }
   }
@@ -297,6 +332,9 @@ export class AIProcessor {
     } catch (dbError) {
       console.warn('[AIProcessor] Failed to save email draft to database:', dbError);
       // Continue with email composition even if database save fails
+=======
+      return 'I encountered an error while processing your request. Please try again.';
+>>>>>>> origin/main
     }
     
     await shell.openExternal(mailtoUrl);
@@ -314,8 +352,13 @@ export class AIProcessor {
         try {
           response = await this.callGeminiAPI(prompt);
           if (this.debug) console.log('[AIProcessor] Using Gemini API');
+<<<<<<< HEAD
         } catch (error: any) {
           if (this.debug) console.log('[AIProcessor] Gemini failed, trying OpenAI:', error.message);
+=======
+        } catch (error) {
+          if (this.debug) console.log('[AIProcessor] Gemini failed, trying OpenAI:', error instanceof Error ? error.message : 'Unknown error');
+>>>>>>> origin/main
           if (this.openaiApiKey) {
             response = await this.callOpenAIAPI(prompt);
             if (this.debug) console.log('[AIProcessor] Using OpenAI API');
@@ -542,6 +585,7 @@ Respond with JSON in this format:
     return 'general';
   }
 
+<<<<<<< HEAD
   private validateEmailAddress(input: string): { hasValidEmail: boolean; emailAddress?: string; nameOnly?: string } {
     // Email regex pattern
     const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
@@ -583,6 +627,9 @@ Respond with JSON in this format:
   }
 
   private generateAIResponse(input: string, commandResult: any, context?: any): string {
+=======
+  private generateAIResponse(input: string, commandResult: any): string {
+>>>>>>> origin/main
     if (commandResult.success) {
       // Command was executed successfully
       return commandResult.message;
@@ -738,6 +785,7 @@ Respond with JSON in this format:
     return this.emailService.getConfigurationStatus();
   }
 
+<<<<<<< HEAD
   private async ensureWhisperModeInitialized(): Promise<void> {
     if (process.env.DISABLE_WHISPER_MODE === 'true') {
       console.log('🎤 Whisper mode disabled by environment variable');
@@ -762,3 +810,16 @@ Respond with JSON in this format:
     }
   }
 } 
+=======
+  private async saveConversation(conversation: Conversation) {
+    if (!this.db) await this.init();
+    this.db!.run(
+      'INSERT INTO conversations (user_input, ai_response, timestamp, context, intent) VALUES (?, ?, ?, ?, ?)',
+      [conversation.user_input, conversation.ai_response, conversation.timestamp, conversation.context, conversation.intent]
+    );
+    this.saveToDisk();
+  }
+}
+
+export const aiProcessor = new AIProcessor(); 
+>>>>>>> origin/main

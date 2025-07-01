@@ -59,8 +59,38 @@ export class EmailService {
         console.log(`[EmailService] Composing email for prompt: "${userPrompt}"`);
       }
 
+      // Check if recipient is just a name (no email address)
+      const recipientInfo = this.extractRecipientInfo(userPrompt);
+      if (this.debug) {
+        console.log('[EmailService] Recipient info:', recipientInfo);
+      }
+      
+      if (recipientInfo.isNameOnly) {
+        return `📧 I found a recipient name: "${recipientInfo.name}"\n\nPlease provide the email address for ${recipientInfo.name} so I can create the email draft.\n\nExample: "john.doe@company.com"`;
+      }
+
       // Generate email draft using Gemini AI
       const emailDraft = await this.generateEmailDraft(userPrompt, context);
+      
+      if (this.debug) {
+        console.log('[EmailService] Original email draft:', {
+          subject: emailDraft.subject,
+          body: emailDraft.body?.substring(0, 100) + '...',
+          recipient: emailDraft.recipient
+        });
+      }
+      
+      // Clean up the email content (remove + signs and fix formatting)
+      emailDraft.body = this.cleanEmailContent(emailDraft.body);
+      emailDraft.subject = this.cleanEmailContent(emailDraft.subject);
+      
+      if (this.debug) {
+        console.log('[EmailService] Cleaned email draft:', {
+          subject: emailDraft.subject,
+          body: emailDraft.body?.substring(0, 100) + '...',
+          recipient: emailDraft.recipient
+        });
+      }
       
       // Save to history
       await this.saveToHistory(userPrompt, emailDraft);
@@ -75,6 +105,126 @@ export class EmailService {
       console.error('[EmailService] Error composing email:', error);
       return `❌ Error composing email: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
+  }
+
+  /**
+   * Extract recipient information from prompt
+   */
+  private extractRecipientInfo(userPrompt: string): { isNameOnly: boolean; name?: string; email?: string } {
+    if (this.debug) {
+      console.log('[EmailService] Analyzing prompt:', userPrompt);
+    }
+    
+    // Look for email patterns (more strict)
+    const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+    const emails = userPrompt.match(emailRegex);
+    
+    if (this.debug) {
+      console.log('[EmailService] Found emails:', emails);
+    }
+    
+    // Simple and reliable name detection patterns
+    const namePatterns = [
+      /to\s+([A-Za-z]+)/i,
+      /email\s+to\s+([A-Za-z]+)/i,
+      /compose\s+email\s+to\s+([A-Za-z]+)/i,
+      /write\s+email\s+to\s+([A-Za-z]+)/i,
+      /send\s+email\s+to\s+([A-Za-z]+)/i
+    ];
+    
+    let foundName: string | undefined;
+    for (let i = 0; i < namePatterns.length; i++) {
+      const pattern = namePatterns[i];
+      const execResult = pattern.exec(userPrompt);
+      if (this.debug) {
+        console.log(`[EmailService] Pattern ${i + 1} (${pattern.source}):`, execResult);
+      }
+      if (execResult && execResult[1]) {
+        const candidate = execResult[1].trim();
+        const commonWords = ['the', 'a', 'an', 'about', 'regarding', 'concerning', 'for', 'meeting', 'discussion', 'project', 'work', 'email'];
+        if (!commonWords.includes(candidate.toLowerCase())) {
+          foundName = candidate;
+          if (this.debug) {
+            console.log(`[EmailService] Found valid name: "${foundName}"`);
+          }
+          break;
+        } else {
+          if (this.debug) {
+            console.log(`[EmailService] Filtered out common word: "${candidate}"`);
+          }
+        }
+      }
+    }
+    if (this.debug) {
+      console.log('[EmailService] Final found name:', foundName);
+    }
+    // If we found a name but no email, it's name-only
+    if (foundName && (!emails || emails.length === 0)) {
+      if (this.debug) {
+        console.log('[EmailService] Name-only case detected');
+      }
+      return { isNameOnly: true, name: foundName };
+    }
+    // If we found an email, validate it's not a fake one
+    if (emails && emails.length > 0) {
+      const email = emails[0];
+      if (this.isFakeEmail(email)) {
+        if (this.debug) {
+          console.log('[EmailService] Fake email detected:', email);
+        }
+        return { isNameOnly: true, name: foundName || 'the recipient' };
+      }
+      if (this.debug) {
+        console.log('[EmailService] Valid email found:', email);
+      }
+      return { isNameOnly: false, email: email };
+    }
+    if (this.debug) {
+      console.log('[EmailService] No name or email detected');
+    }
+    return { isNameOnly: false };
+  }
+
+  /**
+   * Check if email is fake/generated
+   */
+  private isFakeEmail(email: string): boolean {
+    const fakeDomains = [
+      'example.com', 'example.org', 'example.net',
+      'test.com', 'test.org', 'test.net',
+      'demo.com', 'demo.org', 'demo.net',
+      'sample.com', 'sample.org', 'sample.net',
+      'placeholder.com', 'placeholder.org', 'placeholder.net'
+    ];
+    
+    const domain = email.split('@')[1]?.toLowerCase();
+    return fakeDomains.includes(domain || '');
+  }
+
+  /**
+   * Clean email content by removing unwanted characters and fixing formatting
+   */
+  private cleanEmailContent(content: string): string {
+    if (!content) return content;
+    
+    return content
+      // Remove + signs that might be added by the API (more aggressive)
+      .replace(/\+/g, ' ')
+      .replace(/\+\s*/g, ' ')
+      // Fix multiple spaces
+      .replace(/\s+/g, ' ')
+      // Fix line breaks
+      .replace(/\\n/g, '\n')
+      .replace(/\\r\\n/g, '\n')
+      // Remove extra quotes
+      .replace(/^["']|["']$/g, '')
+      // Remove any remaining encoding artifacts
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      // Trim whitespace
+      .trim();
   }
 
   /**
@@ -193,21 +343,33 @@ export class EmailService {
     
     return `Please compose an email based on this request: "${userPrompt}"${contextInfo}
 
+CRITICAL REQUIREMENTS:
+- DO NOT generate or make up email addresses. If no valid email is provided, leave recipient field empty.
+- DO NOT use fake domains like example.com, test.com, etc.
+- DO NOT add any + signs between words or in the content.
+- Use clean, plain text without any encoding characters.
+
 Requirements:
-- Extract recipient from the request if mentioned
+- Extract recipient from the request if mentioned (must be a valid email address)
 - Determine appropriate tone (professional, casual, formal, friendly)
 - Choose appropriate length (brief, detailed, concise)
 - Create a clear, professional subject line
-- Write a well-structured email body
+- Write a well-structured email body with proper formatting
+- Use proper line breaks and spacing
 
 Respond with JSON in this format:
 {
   "subject": "Email Subject",
-  "body": "Email body content...",
-  "recipient": "email@example.com" (if specified),
+  "body": "Email body content with proper formatting and line breaks",
+  "recipient": "email@domain.com" (only if a real email is provided, otherwise null),
   "tone": "professional",
   "length": "brief"
-}`;
+}
+
+Important: 
+- The body should be clean text without any encoding characters or + signs
+- If no real email address is provided, set recipient to null
+- Do not generate fake email addresses`;
   }
 
   /**

@@ -15,10 +15,12 @@ interface ClipboardItem {
 export class ClipboardManager {
   private databaseManager: DatabaseManager;
   private performanceOptimizer: PerformanceOptimizer;
+  private isInitialized = false;
   private isWatching = false;
-  private lastContent = '';
-  private maxHistorySize = 100;
   private watchInterval: NodeJS.Timeout | null = null;
+  private lastCheck = 0;
+  private maxHistorySize = 100;
+  private debug = false;
   private lastSaveTime = 0;
   private lastClipboardText = '';
   private dbName = 'clipboard';

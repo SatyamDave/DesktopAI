@@ -30,12 +30,24 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: transparent;
   overflow: hidden;
+  /* Ensure the body doesn't interfere with the orb */
+  pointer-events: none;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
   background: transparent;
+  /* Allow pointer events on the root for the orb */
+  pointer-events: auto;
+}
+
+/* Ensure the app container allows pointer events */
+.app {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  pointer-events: auto;
 }
 
 /* Floating orb animations */
@@ -153,6 +165,19 @@ body {
   animation: pulse-glow 1s ease-in-out infinite;
 }
 
+/* Enhanced orb visibility */
+.floating-orb button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 10000 !important;
+}
+
+/* Ensure the orb is always on top */
+.floating-orb,
+.floating-orb * {
+  pointer-events: auto !important;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .floating-orb {
@@ -182,9 +207,9 @@ body {
 /* Emergency mode indicator */
 .emergency-mode-indicator {
   position: fixed;
-  top: 40px;
-  right: 10px;
-  background: rgba(255, 0, 0, 0.9);
+  top: 10px;
+  left: 10px;
+  background: rgba(239, 68, 68, 0.9);
   color: white;
   padding: 8px 12px;
   border-radius: 6px;
@@ -203,4 +228,322 @@ body {
 @keyframes emergency-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+/* Ensure the orb is always visible and clickable */
+.floating-orb-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 64px;
+  height: 64px;
+  z-index: 10000;
+  pointer-events: auto;
+}
+
+/* Mode-specific orb styles */
+.orb-ultra-lightweight {
+  background: linear-gradient(135deg, #10b981, #059669, #047857) !important;
+  box-shadow: 0 0 24px 4px #10b981, 0 0 40px 8px #059669 !important;
+}
+
+.orb-emergency {
+  background: linear-gradient(135deg, #ef4444, #dc2626, #b91c1c) !important;
+  box-shadow: 0 0 24px 4px #ef4444, 0 0 40px 8px #dc2626 !important;
+  animation: emergency-pulse 1s infinite !important;
+}
+
+/* Ensure proper layering */
+* {
+  z-index: auto;
+}
+
+.floating-orb,
+.floating-orb * {
+  z-index: 10000 !important;
+}
+
+/* System status indicator */
+.system-status-indicator {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  z-index: 9999;
+  pointer-events: none;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+.status-value {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  min-width: 30px;
+  text-align: right;
+}
+
+/* Real-time overlay styles */
+.realtime-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: auto;
+}
+
+.realtime-overlay-background {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+}
+
+.realtime-overlay-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 20px;
+}
+
+.realtime-overlay-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  max-width: 600px;
+  width: 100%;
+}
+
+.realtime-overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.realtime-overlay-input {
+  padding: 20px;
+}
+
+.realtime-overlay-input input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid rgba(139, 92, 246, 0.2);
+  border-radius: 12px;
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
+}
+
+.realtime-overlay-input input:focus {
+  outline: none;
+  border-color: rgba(139, 92, 246, 0.6);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.realtime-overlay-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.realtime-overlay-action {
+  padding: 6px 12px;
+  background: rgba(139, 92, 246, 0.1);
+  color: rgba(139, 92, 246, 0.8);
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.realtime-overlay-action:hover {
+  background: rgba(139, 92, 246, 0.2);
+  color: rgba(139, 92, 246, 1);
+}
+
+.realtime-overlay-result {
+  padding: 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.realtime-overlay-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.realtime-overlay-result-content {
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Processing indicator */
+.realtime-processing {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.realtime-processing-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(139, 92, 246, 0.8);
+  font-weight: 500;
+}
+
+.realtime-processing-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(139, 92, 246, 0.2);
+  border-top: 3px solid rgba(139, 92, 246, 0.8);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Voice button styles */
+.voice-button {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.voice-button.listening {
+  background: rgba(239, 68, 68, 0.1);
+  color: rgba(239, 68, 68, 0.8);
+  animation: pulse 1s infinite;
+}
+
+.voice-button:not(.listening) {
+  background: rgba(0, 0, 0, 0.1);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.voice-button:hover {
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* Settings panel styles */
+.settings-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  padding: 20px;
+  min-width: 300px;
+  z-index: 10001;
+}
+
+.settings-panel h3 {
+  margin: 0 0 16px 0;
+  color: rgba(0, 0, 0, 0.8);
+  font-weight: 600;
+}
+
+.settings-group {
+  margin-bottom: 16px;
+}
+
+.settings-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: rgba(0, 0, 0, 0.7);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.settings-group input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.settings-group span {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.6);
+  line-height: 1.4;
+}
+
+/* GPU-accelerated canvas */
+.gpu-canvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  will-change: transform;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .system-status-indicator {
+    bottom: 5px;
+    left: 5px;
+    padding: 6px 8px;
+    font-size: 10px;
+    gap: 8px;
+  }
+  
+  .realtime-overlay-card {
+    margin: 10px;
+    max-width: none;
+  }
+  
+  .settings-panel {
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+  }
 } 

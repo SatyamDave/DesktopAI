@@ -1,8 +1,24 @@
 import { globalShortcut, clipboard } from 'electron';
-import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+
+// Optional sql.js import
+let initSqlJs: any = null;
+let Database: any = null;
+let SqlJsStatic: any = null;
+
+try {
+  const sqlJs = require('sql.js');
+  initSqlJs = sqlJs.default || sqlJs;
+  Database = sqlJs.Database;
+  SqlJsStatic = sqlJs.SqlJsStatic;
+} catch (error) {
+  console.warn('⚠️ sql.js not available - whisper mode database features will be disabled');
+}
+
+import { aiProcessor } from './AIProcessor';
+import { configManager } from './ConfigManager';
 
 interface WhisperSession {
   id: number;
@@ -14,17 +30,30 @@ interface WhisperSession {
 }
 
 export class WhisperMode {
-  private db: Database | null = null;
-  private sqlJS: SqlJsStatic | null = null;
-  private dbPath: string;
-  private isActive = false;
+  private isEnabled = false;
   private isRecording = false;
+  private isActive = false;
+  private db: any = null;
+  private sqlJs: any = null;
+  private dbPath: string;
+  private configManager: typeof configManager;
+  private aiProcessor: typeof aiProcessor;
+  private debug = false;
+  private recordingStartTime = 0;
+  private recordingDuration = 0;
   private sessionStartTime = 0;
   private currentTranscript = '';
+  private whisperSessions: WhisperSession[] = [];
+  private currentSession: WhisperSession | null = null;
+  private audioContext: AudioContext | null = null;
+  private mediaStream: MediaStream | null = null;
   private mediaRecorder: any = null;
   private audioChunks: Blob[] = [];
 
   constructor() {
+    this.configManager = configManager;
+    this.aiProcessor = aiProcessor;
+    
     const dbDir = path.join(os.homedir(), '.doppel');
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
@@ -33,12 +62,12 @@ export class WhisperMode {
   }
 
   public async init() {
-    this.sqlJS = await initSqlJs();
+    this.sqlJs = await initSqlJs();
     if (fs.existsSync(this.dbPath)) {
       const filebuffer = fs.readFileSync(this.dbPath);
-      this.db = new this.sqlJS.Database(filebuffer);
+      this.db = new this.sqlJs.Database(filebuffer);
     } else {
-      this.db = new this.sqlJS.Database();
+      this.db = new this.sqlJs.Database();
       this.initializeDatabase();
       this.saveToDisk();
     }
@@ -298,10 +327,10 @@ export class WhisperMode {
       const recentSessions = recentRes[0]?.values?.map((row: any) => row[0]) || [];
       
       const words = recentSessions
-        .flatMap(s => s.toLowerCase().split(/\s+/))
-        .filter(word => word.length > 3);
+        .flatMap((s: string) => s.toLowerCase().split(/\s+/))
+        .filter((word: string) => word.length > 3);
       
-      const wordCount = words.reduce((acc, word) => {
+      const wordCount = words.reduce((acc: Record<string, number>, word: string) => {
         acc[word] = (acc[word] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
@@ -358,5 +387,13 @@ export class WhisperMode {
       isActive: this.isActive,
       isRecording: this.isRecording
     };
+  }
+
+  private async extractKeywords(text: string): Promise<string[]> {
+    return text
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter((word: string) => word.length > 3);
   }
 } 

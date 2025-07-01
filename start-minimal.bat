@@ -22,6 +22,24 @@ echo - Performance monitoring: DISABLED
 echo - Database: DISABLED
 echo - Animations: DISABLED
 
-npm run dev
+echo.
+echo Building main process...
+call npm run build:main
+if %ERRORLEVEL% neq 0 (
+    echo ❌ Failed to build main process
+    pause
+    exit /b 1
+)
+
+echo.
+echo Starting development server...
+start /B npm run dev:renderer
+
+echo Waiting for Vite server to start...
+timeout /t 3 /nobreak >nul
+
+echo.
+echo Starting Electron app...
+npm run dev:main
 
 pause 
