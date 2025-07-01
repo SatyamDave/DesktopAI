@@ -97,11 +97,13 @@ function createFloatingWindow() {
       }
     });
 
-    // Use the fallback HTML directly for guaranteed functionality
-    const fallbackPath = path.join(__dirname, '../../orb-fallback.html');
-    console.log(`🚀 Loading fallback HTML: ${fallbackPath}`);
-    
-    floatingWindow.loadFile(fallbackPath);
+    // Load the regular React-based orb overlay
+    const orbUrl = isDev
+      ? 'http://localhost:3003/orb'
+      : `file://${path.join(__dirname, '../renderer/index.html')}?orb`;
+
+    console.log(`🚀 Loading orb overlay: ${orbUrl}`);
+    floatingWindow.loadURL(orbUrl);
 
     floatingWindow.on('ready-to-show', () => {
       console.log('✅ Orb window ready to show');
