@@ -110,8 +110,8 @@ class SimpleOrbApp {
       const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
       
       // Make the window larger to ensure the orb is visible
-      const orbSize = 120;
-      const margin = 30;
+      const orbSize = 200; // Increased from 120 to 200
+      const margin = 50;
       const x = screenWidth - orbSize - margin;
       const y = screenHeight - orbSize - margin;
       
@@ -137,9 +137,10 @@ class SimpleOrbApp {
         }
       });
 
-      // Use the correct port that Vite is running on (3006)
-      const url = this.isDev ? 'http://localhost:3006?orb=true' : `file://${path.join(__dirname, '../renderer/index.html')}?orb=true`;
-      console.log(`🚀 Loading URL: ${url}`);
+      // Load the fallback HTML file directly for reliability
+      const fallbackPath = path.join(__dirname, '../../orb-fallback.html');
+      const url = `file://${fallbackPath}`;
+      console.log(`🚀 Loading fallback HTML: ${url}`);
       
       this.floatingWindow.loadURL(url);
 
@@ -178,28 +179,25 @@ class SimpleOrbApp {
 
   private setupGlobalShortcuts() {
     try {
-      // Cmd/Ctrl + H to toggle orb visibility
-      const toggleOrbShortcut = process.platform === 'darwin' ? 'Command+H' : 'Control+H';
-      globalShortcut.register(toggleOrbShortcut, () => {
+      // Alt + D to toggle orb visibility (show/hide)
+      globalShortcut.register('Alt+D', () => {
         if (this.floatingWindow) {
           if (this.floatingWindow.isVisible()) {
             this.floatingWindow.hide();
+            console.log('🪟 Orb hidden');
           } else {
             this.floatingWindow.show();
             this.floatingWindow.focus();
+            console.log('🪟 Orb shown');
           }
         }
-      });
-
-      // Alt + Space to show orb
-      globalShortcut.register('Alt+Space', () => {
-        this.showFloatingWindow();
       });
 
       // ESC to hide floating window
       globalShortcut.register('Escape', () => {
         if (this.floatingWindow?.isVisible()) {
           this.floatingWindow.hide();
+          console.log('🪟 Orb hidden (Escape)');
         }
       });
 

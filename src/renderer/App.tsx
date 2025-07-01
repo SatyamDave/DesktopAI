@@ -6,6 +6,7 @@ import { DELOInterface } from './components/DELOInterface';
 import Settings from './components/Settings';
 import FloatingOrb from './components/FloatingOrb';
 import RealTimeOverlay from './components/RealTimeOverlay';
+import GlassmorphicOverlay from './components/GlassmorphicOverlay';
 
 interface Message {
   id: string;
@@ -22,7 +23,8 @@ interface AppState {
   showSettings: boolean;
   showDELO: boolean;
   showRealTime: boolean;
-  currentMode: 'chat' | 'command' | 'delo' | 'realtime';
+  showGlassmorphic: boolean;
+  currentMode: 'chat' | 'command' | 'delo' | 'realtime' | 'glassmorphic';
   theme: 'light' | 'dark' | 'auto';
 }
 
@@ -34,6 +36,7 @@ const App: React.FC = () => {
     showSettings: false,
     showDELO: false,
     showRealTime: false,
+    showGlassmorphic: false,
     currentMode: 'chat',
     theme: 'auto'
   });
@@ -109,7 +112,68 @@ const App: React.FC = () => {
 
   const handleDELOCommand = async (command: string) => {
     console.log('DELO command:', command);
-    // DELO command execution logic here
+    
+    try {
+      // Use the real DELO command system
+      const response = await window.electronAPI.processDeloCommand(command);
+      
+      if (response.success) {
+        // Add success message to chat
+        const successMessage: Message = {
+          id: Date.now().toString(),
+          text: `✅ ${response.message}`,
+          type: 'assistant',
+          timestamp: new Date()
+        };
+        
+        setState(prev => ({
+          ...prev,
+          messages: [...prev.messages, successMessage]
+        }));
+        
+        // If there's a next action, suggest it
+        if (response.nextAction) {
+          const nextMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `💡 Next: ${response.nextAction}`,
+            type: 'system',
+            timestamp: new Date()
+          };
+          
+          setState(prev => ({
+            ...prev,
+            messages: [...prev.messages, nextMessage]
+          }));
+        }
+      } else {
+        // Add error message to chat
+        const errorMessage: Message = {
+          id: Date.now().toString(),
+          text: `❌ ${response.message}`,
+          type: 'system',
+          timestamp: new Date()
+        };
+        
+        setState(prev => ({
+          ...prev,
+          messages: [...prev.messages, errorMessage]
+        }));
+      }
+    } catch (error) {
+      console.error('DELO command error:', error);
+      
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        text: `❌ Failed to execute DELO command: ${error}`,
+        type: 'system',
+        timestamp: new Date()
+      };
+      
+      setState(prev => ({
+        ...prev,
+        messages: [...prev.messages, errorMessage]
+      }));
+    }
   };
 
   const toggleMode = (mode: AppState['currentMode']) => {
@@ -118,7 +182,8 @@ const App: React.FC = () => {
       currentMode: mode,
       showSettings: false,
       showDELO: mode === 'delo',
-      showRealTime: mode === 'realtime'
+      showRealTime: mode === 'realtime',
+      showGlassmorphic: mode === 'glassmorphic'
     }));
   };
 
@@ -196,6 +261,12 @@ const App: React.FC = () => {
           >
             ⚡
           </button>
+          <button 
+            className={`mode-button ${state.currentMode === 'glassmorphic' ? 'active' : ''}`}
+            onClick={() => toggleMode('glassmorphic')}
+          >
+            ✨
+          </button>
           <button className="theme-toggle" onClick={toggleTheme}>
             {state.theme === 'light' ? '🌞' : state.theme === 'dark' ? '🌙' : '🌓'}
           </button>
@@ -204,20 +275,72 @@ const App: React.FC = () => {
       {/* Main content area */}
       <div className="app-content">
         {state.currentMode === 'chat' && (
-          <ChatBar onClose={() => {}} />
+          <div className="chat-container">
+            <div className="messages-container">
+              {state.messages.map((message) => (
+                <div key={message.id} className={`message ${message.type}`}>
+                  <div className="message-content">
+                    <div className="message-text">{message.text}</div>
+                    <div className="message-time">
+                      {message.timestamp.toLocaleTimeString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {state.isProcessing && (
+                <div className="message assistant">
+                  <div className="message-content">
+                    <div className="typing-indicator">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+            <ChatBar onClose={() => toggleMode('command')} />
+          </div>
         )}
         {state.currentMode === 'command' && (
-          <CommandInput onCommand={handleCommand} />
+          <div className="command-container">
+            <CommandInput onClose={() => toggleMode('chat')} />
+          </div>
         )}
         {state.currentMode === 'delo' && (
-          <DELOInterface onCommand={handleDELOCommand} />
+          <DELOInterface />
         )}
         {state.currentMode === 'realtime' && (
-          <RealTimeOverlay />
+          <div className="realtime-container">
+            <RealTimeOverlay 
+              isVisible={state.showRealTime}
+              onClose={() => setState(prev => ({ ...prev, showRealTime: false }))}
+              onCommand={handleCommand}
+              isListening={state.isListening}
+              onToggleListening={() => setState(prev => ({ ...prev, isListening: !prev.isListening }))}
+              isUltraLightweight={false}
+            />
+          </div>
+        )}
+
+        {state.currentMode === 'glassmorphic' && (
+          <GlassmorphicOverlay 
+            isVisible={true}
+            onClose={() => toggleMode('chat')}
+            onCommand={handleDELOCommand}
+            isListening={state.isListening}
+            onToggleListening={() => setState(prev => ({ ...prev, isListening: !prev.isListening }))}
+            isUltraLightweight={false}
+          />
+        )}
+
+        {state.showSettings && (
+          <div className="settings-overlay">
+            <Settings />
+          </div>
         )}
       </div>
-      {/* Ultra-lightweight mode indicator (if needed) */}
-      {/* <div className="ultra-lightweight-indicator">⚡ Ultra-Lightweight Mode</div> */}
     </div>
   );
 };

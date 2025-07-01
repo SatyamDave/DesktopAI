@@ -134,28 +134,25 @@ function createFloatingWindow() {
 
 function setupGlobalShortcuts() {
   try {
-    // Cmd/Ctrl + H to toggle orb visibility
-    const toggleOrbShortcut = process.platform === 'darwin' ? 'Command+H' : 'Control+H';
-    globalShortcut.register(toggleOrbShortcut, () => {
+    // Alt + D to toggle orb visibility (show/hide)
+    globalShortcut.register('Alt+D', () => {
       if (floatingWindow) {
         if (floatingWindow.isVisible()) {
           floatingWindow.hide();
+          console.log('🪟 Orb hidden');
         } else {
           floatingWindow.show();
           floatingWindow.focus();
+          console.log('🪟 Orb shown');
         }
       }
-    });
-
-    // Alt + Space to show orb
-    globalShortcut.register('Alt+Space', () => {
-      showFloatingWindow();
     });
 
     // ESC to hide floating window
     globalShortcut.register('Escape', () => {
       if (floatingWindow && floatingWindow.isVisible()) {
         floatingWindow.hide();
+        console.log('🪟 Orb hidden (Escape)');
       }
     });
 

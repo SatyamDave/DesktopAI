@@ -1,40 +1,84 @@
 import React, { useState, useEffect } from 'react';
 import FloatingOrb from './components/FloatingOrb';
-import CommandInterface from './components/CommandInterface';
+import GlassmorphicOverlay from './components/GlassmorphicOverlay';
 import './App.css';
 
-const OrbApp: React.FC = () => {
-  const [isUltraLightweight, setIsUltraLightweight] = useState(false);
-  const [emergencyMode, setEmergencyMode] = useState(false);
-  const [showCommandInterface, setShowCommandInterface] = useState(false);
-  const [orbPosition, setOrbPosition] = useState({ x: 0, y: 0 });
+interface OrbAppProps {
+  isUltraLightweight?: boolean;
+  emergencyMode?: boolean;
+}
 
-  useEffect(() => {
-    console.log('🪟 OrbApp component mounted');
-    console.log('🪟 URL params:', window.location.search);
-    console.log('🪟 Window name:', window.name);
+const OrbApp: React.FC<OrbAppProps> = ({ 
+  isUltraLightweight = false, 
+  emergencyMode = false 
+}) => {
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  // Handle orb click to show overlay
+  const handleOrbClick = (position: { x: number; y: number }) => {
+    console.log('🪟 Orb clicked at:', position);
+    setShowOverlay(true);
+  };
+
+  // Handle overlay close
+  const handleOverlayClose = () => {
+    setShowOverlay(false);
+    setIsListening(false);
+  };
+
+  // Handle command execution
+  const handleCommand = async (command: string) => {
+    console.log('🪟 Executing command:', command);
     
-    // Check for ultra-lightweight mode
-    const checkMode = () => {
-      const isUltra = process.env.ULTRA_LIGHTWEIGHT === 'true';
-      const isEmergency = process.env.EMERGENCY_MODE === 'true';
-      setIsUltraLightweight(isUltra);
-      setEmergencyMode(isEmergency);
-      console.log('🔧 OrbApp mode:', { isUltra, isEmergency });
+    // Simulate command processing
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Here you would integrate with your actual command system
+    // For now, we'll just log the command
+    console.log('✅ Command executed:', command);
+    
+    // Close overlay after successful command
+    setTimeout(() => {
+      setShowOverlay(false);
+      setIsListening(false);
+    }, 500);
+  };
+
+  // Handle listening toggle
+  const handleToggleListening = () => {
+    setIsListening(!isListening);
+    console.log('🎤 Listening toggled:', !isListening);
+  };
+
+  // Global hotkey support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + D to toggle overlay
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD') {
+        e.preventDefault();
+        setShowOverlay(!showOverlay);
+        return;
+      }
+
+      // Escape to close overlay
+      if (e.code === 'Escape' && showOverlay) {
+        e.preventDefault();
+        handleOverlayClose();
+        return;
+      }
+
+      // Ctrl/Cmd + L to toggle listening
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyL') {
+        e.preventDefault();
+        handleToggleListening();
+        return;
+      }
     };
 
-    checkMode();
-  }, []);
-
-  const handleOrbClick = (position: { x: number; y: number }) => {
-    console.log('🪟 Orb clicked at position:', position);
-    setOrbPosition(position);
-    setShowCommandInterface(true);
-  };
-
-  const handleCloseCommandInterface = () => {
-    setShowCommandInterface(false);
-  };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showOverlay]);
 
   return (
     <div className="orb-app" style={{ 
@@ -53,10 +97,13 @@ const OrbApp: React.FC = () => {
         emergencyMode={emergencyMode}
       />
       
-      <CommandInterface
-        isVisible={showCommandInterface}
-        onClose={handleCloseCommandInterface}
-        position={orbPosition}
+      <GlassmorphicOverlay
+        isVisible={showOverlay}
+        onClose={handleOverlayClose}
+        onCommand={handleCommand}
+        isListening={isListening}
+        onToggleListening={handleToggleListening}
+        isUltraLightweight={isUltraLightweight}
       />
     </div>
   );

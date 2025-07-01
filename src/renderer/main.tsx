@@ -3,13 +3,15 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import Overlay from './Overlay';
 import OrbApp from './OrbApp';
+import GlassChatApp from './GlassChatApp';
 import './index.css';
 
-const path = window.location.pathname;
+// Check which app to render based on URL parameters
 const isOrbWindow = window.location.search.includes('orb=true') || window.name === 'orb';
+const isGlassChatWindow = window.location.search.includes('glasschat=true') || window.name === 'glasschat';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {path === '/overlay' ? <Overlay /> : isOrbWindow ? <OrbApp /> : <App />}
+    {isGlassChatWindow ? <GlassChatApp /> : isOrbWindow ? <OrbApp /> : window.location.pathname === '/overlay' ? <Overlay /> : <App />}
   </React.StrictMode>
 ); 

@@ -3,17 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DELO Orb</title>
+    <title>DELO Assistant</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
             margin: 0;
             padding: 0;
             background: transparent;
             overflow: hidden;
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         
-        .orb-container {
+        /* Main Container */
+        .delo-container {
             position: fixed;
             top: 0;
             left: 0;
@@ -23,243 +34,679 @@
             z-index: 1000;
         }
         
-        .orb {
+        /* Floating Orb - Visible by default */
+        /* REMOVE ALL .delo-orb styles and markup */
+        /* REMOVE orb-related JS and references */
+        
+        /* Glow Ring */
+        .glow-ring {
             position: absolute;
-            bottom: 30px;
-            right: 30px;
+            bottom: 60px;
+            right: 60px;
             width: 80px;
             height: 80px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #8b5cf6, #7c3aed, #6d28d9);
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 4px 32px 0 rgba(139, 92, 246, 0.3);
-            cursor: grab;
+            background: linear-gradient(135deg, 
+                rgba(0, 122, 255, 0.3), 
+                rgba(88, 86, 214, 0.3));
+            filter: blur(20px);
+            opacity: 0;
+            z-index: -1;
+            pointer-events: none;
+            transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .glow-ring.active {
+            opacity: 0.6;
+            transform: scale(1.2);
+        }
+        
+        .glow-ring.listening {
+            animation: glowPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes glowPulse {
+            0%, 100% { 
+                opacity: 0.6;
+                transform: scale(1.2);
+            }
+            50% { 
+                opacity: 0.8;
+                transform: scale(1.4);
+            }
+        }
+        
+        /* Command Overlay */
+        .command-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            display: none;
             pointer-events: auto;
-            transition: all 0.3s ease;
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .command-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+        
+        /* Command Bar */
+        .command-bar {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            width: 600px;
+            max-width: 90vw;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(40px) saturate(1.2);
+            -webkit-backdrop-filter: blur(40px) saturate(1.2);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 
+                0 25px 80px rgba(0, 0, 0, 0.15),
+                0 12px 32px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .command-overlay.active .command-bar {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        
+        /* Command Input */
+        .command-input-container {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .input-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, 
+                rgba(0, 122, 255, 0.1), 
+                rgba(88, 86, 214, 0.1));
+            border: 1px solid rgba(0, 122, 255, 0.2);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-size: 24px;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-        
-        .orb:active {
-            cursor: grabbing;
-        }
-        
-        .orb:hover {
-            transform: scale(1.2);
-            box-shadow: 0 8px 48px 0 rgba(139, 92, 246, 0.5);
-            filter: brightness(1.3);
-        }
-        
-        .orb:active {
-            transform: scale(0.9);
-        }
-        
-        .glow {
-            position: absolute;
-            bottom: 30px;
-            right: 30px;
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #8b5cf6, #7c3aed, #6d28d9);
-            filter: blur(20px);
-            opacity: 0.3;
-            z-index: -1;
-            pointer-events: none;
-        }
-        
-        .command-interface {
-            position: absolute;
-            bottom: 120px;
-            right: 30px;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            border-radius: 12px;
-            padding: 20px;
-            min-width: 300px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            display: none;
-            pointer-events: auto;
-        }
-        
-        .command-interface.show {
-            display: block;
+            color: #007AFF;
+            font-size: 18px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
         }
         
         .command-input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-        
-        .command-button {
-            background: #8b5cf6;
-            color: white;
+            flex: 1;
+            padding: 16px 20px;
             border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
+            border-radius: 16px;
+            font-size: 16px;
+            font-family: inherit;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            color: #1D1D1F;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        
+        .command-input:focus {
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 
+                0 0 0 3px rgba(0, 122, 255, 0.2),
+                0 4px 16px rgba(0, 122, 255, 0.1);
+        }
+        
+        .command-input::placeholder {
+            color: #86868B;
+        }
+        
+        /* Voice Button */
+        .voice-button {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, 
+                rgba(52, 199, 89, 0.1), 
+                rgba(48, 209, 88, 0.1));
+            border: 1px solid rgba(52, 199, 89, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #34C759;
+            font-size: 18px;
             cursor: pointer;
-            margin-right: 8px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
         }
         
-        .command-button:hover {
-            background: #7c3aed;
+        .voice-button:hover {
+            background: linear-gradient(135deg, 
+                rgba(52, 199, 89, 0.2), 
+                rgba(48, 209, 88, 0.2));
+            transform: scale(1.05);
         }
         
-        .status {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.8);
+        .voice-button.listening {
+            background: linear-gradient(135deg, 
+                rgba(255, 59, 48, 0.2), 
+                rgba(255, 45, 85, 0.2));
+            border-color: rgba(255, 59, 48, 0.3);
+            color: #FF3B30;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .action-button {
+            padding: 10px 16px;
+            border: 1px solid rgba(0, 122, 255, 0.2);
+            border-radius: 12px;
+            background: rgba(0, 122, 255, 0.1);
+            color: #007AFF;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        
+        .action-button:hover {
+            background: rgba(0, 122, 255, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        /* Results Area */
+        .results-area {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .result-item {
+            padding: 16px;
+            background: rgba(242, 242, 247, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            margin-bottom: 12px;
+            opacity: 0;
+            transform: translateY(10px);
+            animation: slideIn 0.4s ease forwards;
+        }
+        
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .result-success {
+            border-left: 3px solid #34C759;
+        }
+        
+        .result-error {
+            border-left: 3px solid #FF3B30;
+        }
+        
+        .result-warning {
+            border-left: 3px solid #FF9500;
+        }
+        
+        /* Confirmation Interface */
+        .confirmation-area {
+            background: linear-gradient(135deg, 
+                rgba(254, 247, 224, 0.9), 
+                rgba(255, 249, 230, 0.9));
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 149, 0, 0.3);
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .confirmation-area.active {
+            display: block;
+            animation: slideIn 0.4s ease;
+        }
+        
+        .confirmation-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .confirmation-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, 
+                rgba(255, 149, 0, 0.2), 
+                rgba(255, 107, 53, 0.2));
+            border: 1px solid rgba(255, 149, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #FF9500;
+            font-size: 16px;
+        }
+        
+        .confirmation-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1D1D1F;
+        }
+        
+        .clarification-content {
+            margin-bottom: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #1D1D1F;
+        }
+        
+        .clarification-item {
+            margin-bottom: 12px;
+        }
+        
+        .clarification-label {
+            font-weight: 600;
+            color: #007AFF;
+            margin-bottom: 4px;
+        }
+        
+        .action-steps {
+            margin: 12px 0;
+            padding-left: 20px;
+        }
+        
+        .action-steps li {
+            margin-bottom: 6px;
+            color: #1D1D1F;
+        }
+        
+        .confirmation-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: inherit;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            margin-bottom: 16px;
+            outline: none;
+        }
+        
+        .confirmation-input:focus {
+            border-color: rgba(0, 122, 255, 0.6);
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+        }
+        
+        .confirmation-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .confirm-button {
+            flex: 1;
+            padding: 12px 20px;
+            border: 1px solid rgba(0, 122, 255, 0.3);
+            border-radius: 12px;
+            background: linear-gradient(135deg, 
+                rgba(0, 122, 255, 0.9), 
+                rgba(0, 86, 204, 0.9));
             color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        
+        .confirm-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
+        }
+        
+        .cancel-button {
+            flex: 1;
+            padding: 12px 20px;
+            border: 1px solid rgba(255, 59, 48, 0.3);
+            border-radius: 12px;
+            background: linear-gradient(135deg, 
+                rgba(255, 59, 48, 0.9), 
+                rgba(215, 0, 21, 0.9));
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        
+        .cancel-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(255, 59, 48, 0.3);
+        }
+        
+        /* Examples Section */
+        .examples-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+        }
+        
+        .examples-title {
             font-size: 12px;
+            font-weight: 600;
+            color: #86868B;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+        
+        .examples-grid {
+            display: grid;
+            gap: 8px;
+        }
+        
+        .example-item {
+            font-size: 12px;
+            color: #86868B;
+            padding: 4px 0;
+        }
+        
+        .example-command {
+            color: #007AFF;
+            font-weight: 500;
+        }
+        
+        /* Status Indicator */
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
             pointer-events: none;
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+        
+        .status-indicator.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .command-bar {
+                width: 95vw;
+                padding: 20px;
+            }
+            
+            .glow-ring {
+                bottom: 30px;
+                right: 30px;
+            }
+        }
+        
+        /* Loading Animation */
+        .loading-dots {
+            display: inline-block;
+        }
+        
+        .loading-dots::after {
+            content: '';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
         }
     </style>
 </head>
 <body>
-    <div class="status">DELO Orb Active - Press Ctrl+H to toggle</div>
-    
-    <div class="orb-container">
-        <div class="glow"></div>
-        <div class="orb" onclick="toggleCommandInterface()">
-            🤖
+    <div class="delo-container">
+        <!-- Status Indicator -->
+        <div class="status-indicator" id="statusIndicator">
+            DELO Active • Press Alt+Space
         </div>
         
-        <div class="command-interface" id="commandInterface">
-            <h3 style="margin: 0 0 15px 0; color: #333;">DELO Assistant</h3>
-            <input type="text" class="command-input" id="commandInput" placeholder="What would you like me to do?" onkeydown="handleKeyDown(event)">
-            <div style="margin-top: 10px;">
-                <button class="command-button" onclick="executeCommand()">Send to Gemini</button>
-                <button class="command-button" onclick="toggleCommandInterface()" style="background: #6b7280;">Cancel</button>
-            </div>
-            <div id="result" style="margin-top: 10px; padding: 10px; background: #f3f4f6; border-radius: 6px; display: none;"></div>
-            <div id="confirmation" style="margin-top: 10px; padding: 10px; background: #fef3c7; border-radius: 6px; display: none;">
-                <div style="margin-bottom: 10px;">
-                    <strong>🤖 Here's what I understood from your prompt:</strong>
+        <!-- Floating Orb -->
+        <!-- REMOVE ALL .delo-orb styles and markup -->
+        <!-- REMOVE orb-related JS and references -->
+        
+        <!-- Glow Ring -->
+        <div class="glow-ring" id="glowRing"></div>
+        
+        <!-- Command Overlay -->
+        <div class="command-overlay" id="commandOverlay" onclick="deactivateDELO()">
+            <div class="command-bar" onclick="event.stopPropagation()">
+                <!-- Command Input -->
+                <div class="command-input-container">
+                    <div class="input-icon">✨</div>
+                    <input type="text" 
+                           class="command-input" 
+                           id="commandInput" 
+                           placeholder="What would you like me to help you with?"
+                           onkeydown="handleKeyDown(event)">
+                    <div class="voice-button" id="voiceButton" onclick="toggleVoice()">
+                        🎤
+                    </div>
                 </div>
-                <div id="clarification-content" style="margin-bottom: 10px;"></div>
-                <div style="margin-top: 10px;">
-                    <input type="text" id="confirmationInput" placeholder="Type 'yes' to proceed or 'no' to modify" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px;">
-                    <button class="command-button" onclick="confirmExecution()" style="background: #059669;">Confirm & Execute</button>
-                    <button class="command-button" onclick="modifyPrompt()" style="background: #dc2626;">Modify Prompt</button>
+                
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <div class="action-button" onclick="quickAction('summarize')">📝 Summarize</div>
+                    <div class="action-button" onclick="quickAction('email')">📧 Email</div>
+                    <div class="action-button" onclick="quickAction('search')">🔍 Search</div>
+                    <div class="action-button" onclick="quickAction('open')">🚀 Open</div>
                 </div>
-            </div>
-            <div style="margin-top: 10px; font-size: 12px; color: #6b7280;">
-                <div>🧠 DELO AI Examples:</div>
-                <div>• "summarize this" → summarizes clipboard content</div>
-                <div>• "email this to team" → drafts email with content</div>
-                <div>• "search amazon for sd cards" → opens Amazon search</div>
-                <div>• "fix this spelling" → corrects clipboard text</div>
-                <div>• "what time is it" → shows current time</div>
-                <div>Press Enter to send to Gemini, Esc to close</div>
+                
+                <!-- Results Area -->
+                <div class="results-area" id="resultsArea"></div>
+                
+                <!-- Confirmation Area -->
+                <div class="confirmation-area" id="confirmationArea">
+                    <div class="confirmation-header">
+                        <div class="confirmation-icon">🤖</div>
+                        <div class="confirmation-title">Here's what I understood:</div>
+                    </div>
+                    <div class="clarification-content" id="clarificationContent"></div>
+                    <input type="text" 
+                           id="confirmationInput" 
+                           placeholder="Type 'yes' to proceed or 'no' to modify"
+                           class="confirmation-input"
+                           onkeydown="handleConfirmationKeyDown(event)">
+                    <div class="confirmation-buttons">
+                        <button class="confirm-button" onclick="confirmExecution()">Confirm & Execute</button>
+                        <button class="cancel-button" onclick="modifyPrompt()">Modify Prompt</button>
+                    </div>
+                </div>
+                
+                <!-- Examples Section -->
+                <div class="examples-section">
+                    <div class="examples-title">Quick Examples</div>
+                    <div class="examples-grid">
+                        <div class="example-item">
+                            <span class="example-command">"summarize this"</span> → summarizes clipboard content
+                        </div>
+                        <div class="example-item">
+                            <span class="example-command">"email this to team"</span> → drafts email with content
+                        </div>
+                        <div class="example-item">
+                            <span class="example-command">"search amazon for sd cards"</span> → opens Amazon search
+                        </div>
+                        <div class="example-item">
+                            <span class="example-command">"fix this spelling"</span> → corrects clipboard text
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        let isDragging = false;
-        let dragOffset = { x: 0, y: 0 };
-        
-        const orb = document.querySelector('.orb');
-        const glow = document.querySelector('.glow');
-        const commandInterface = document.getElementById('commandInterface');
-        const commandInput = document.getElementById('commandInput');
-        const result = document.getElementById('result');
-        const confirmation = document.getElementById('confirmation');
-        const confirmationInput = document.getElementById('confirmationInput');
-        const clarificationContent = document.getElementById('clarification-content');
-        
-        // Store current command state
+        // State management
+        let isActive = false;
+        let isListening = false;
         let currentCommandState = null;
         
-        // Make orb draggable
-        orb.addEventListener('mousedown', startDrag);
-        document.addEventListener('mousemove', drag);
-        document.addEventListener('mouseup', stopDrag);
+        // DOM elements
+        const glowRing = document.getElementById('glowRing');
+        const commandOverlay = document.getElementById('commandOverlay');
+        const commandInput = document.getElementById('commandInput');
+        const voiceButton = document.getElementById('voiceButton');
+        const resultsArea = document.getElementById('resultsArea');
+        const confirmationArea = document.getElementById('confirmationArea');
+        const confirmationInput = document.getElementById('confirmationInput');
+        const clarificationContent = document.getElementById('clarificationContent');
+        const statusIndicator = document.getElementById('statusIndicator');
         
-        function startDrag(e) {
-            if (e.target === orb) {
-                isDragging = true;
-                const rect = orb.getBoundingClientRect();
-                dragOffset.x = e.clientX - rect.left;
-                dragOffset.y = e.clientY - rect.top;
+        // Initialize DELO
+        function initDELO() {
+            // Show status indicator briefly
+            statusIndicator.classList.add('active');
+            setTimeout(() => {
+                statusIndicator.classList.remove('active');
+            }, 3000);
+            
+            // Make orb visible by default
+            glowRing.classList.add('active');
+            
+            // Set up global shortcuts
+            document.addEventListener('keydown', handleGlobalKeyDown);
+            
+            console.log('DELO initialized - Glow ring visible by default. Press Alt+D to toggle command overlay');
+        }
+        
+        // Global keyboard shortcuts
+        function handleGlobalKeyDown(e) {
+            // Alt+D to toggle command overlay
+            if (e.altKey && e.code === 'KeyD') {
                 e.preventDefault();
+                if (isActive) {
+                    deactivateDELO();
+                } else {
+                    activateDELO();
+                }
+            }
+            
+            // Escape to deactivate
+            if (e.code === 'Escape' && isActive) {
+                e.preventDefault();
+                deactivateDELO();
             }
         }
         
-        function drag(e) {
-            if (isDragging) {
-                const x = Math.max(0, Math.min(window.innerWidth - 80, e.clientX - dragOffset.x));
-                const y = Math.max(0, Math.min(window.innerHeight - 80, e.clientY - dragOffset.y));
-                
-                orb.style.left = x + 'px';
-                orb.style.top = y + 'px';
-                orb.style.right = 'auto';
-                orb.style.bottom = 'auto';
-                
-                glow.style.left = x + 'px';
-                glow.style.top = y + 'px';
-                glow.style.right = 'auto';
-                glow.style.bottom = 'auto';
-            }
-        }
-        
-        function stopDrag() {
-            isDragging = false;
-        }
-        
-        function toggleCommandInterface() {
-            const isVisible = commandInterface.classList.contains('show');
-            if (isVisible) {
-                commandInterface.classList.remove('show');
-                result.style.display = 'none';
-            } else {
-                commandInterface.classList.add('show');
+        // Activate DELO
+        function activateDELO() {
+            if (isActive) return;
+            
+            isActive = true;
+            commandOverlay.classList.add('active');
+            
+            // Focus input after animation
+            setTimeout(() => {
                 commandInput.focus();
-            }
+            }, 400);
+            
+            console.log('DELO command overlay activated');
         }
         
+        // Deactivate DELO
+        function deactivateDELO() {
+            if (!isActive) return;
+            
+            isActive = false;
+            commandOverlay.classList.remove('active');
+            
+            // Clear results
+            resultsArea.innerHTML = '';
+            confirmationArea.classList.remove('active');
+            commandInput.value = '';
+            currentCommandState = null;
+            
+            console.log('DELO command overlay deactivated');
+        }
+        
+        // Handle command input
         function handleKeyDown(e) {
             if (e.key === 'Enter') {
-                if (confirmation.style.display === 'block') {
+                if (confirmationArea.classList.contains('active')) {
                     confirmExecution();
                 } else {
                     executeCommand();
                 }
-            } else if (e.key === 'Escape') {
-                if (confirmation.style.display === 'block') {
-                    modifyPrompt();
-                } else {
-                    toggleCommandInterface();
-                }
             }
         }
         
+        // Handle confirmation input
+        function handleConfirmationKeyDown(e) {
+            if (e.key === 'Enter') {
+                confirmExecution();
+            } else if (e.key === 'Escape') {
+                modifyPrompt();
+            }
+        }
+        
+        // Execute command
         async function executeCommand() {
             const command = commandInput.value.trim();
             if (!command) return;
             
-            result.style.display = 'block';
-            result.innerHTML = '<div style="color: #8b5cf6;">🤖 Sending to Gemini for clarification...</div>';
-            confirmation.style.display = 'none';
+            // Show loading state
+            addResult('🤖 Processing command...', 'warning');
             
             try {
                 if (window.electronAPI) {
-                    console.log('Sending command to Gemini via electronAPI:', command);
                     const response = await window.electronAPI.executeCommand(command);
-                    console.log('Gemini response:', response);
                     
                     if (response && response.success && response.needsConfirmation) {
                         // Store command state for confirmation
@@ -272,54 +719,97 @@
                         // Show clarification for user confirmation
                         showClarification(response.clarification, command);
                     } else if (response && response.success) {
-                        result.innerHTML = `<div style="color: #059669;"><strong>✅ Success:</strong> ${response.result || 'Command executed successfully'}</div>`;
+                        addResult(`✅ ${response.result || 'Command executed successfully'}`, 'success');
                     } else {
-                        result.innerHTML = `<div style="color: #dc2626;"><strong>❌ Error:</strong> ${response.error || 'Command failed'}</div>`;
+                        addResult(`❌ ${response.error || 'Command failed'}`, 'error');
                     }
                 } else {
-                    console.log('electronAPI not available, using fallback');
-                    result.innerHTML = `<div style="color: #059669;"><strong>✅ Result:</strong> Command sent to Gemini: ${command}</div>`;
+                    addResult(`✅ Command sent to Gemini: ${command}`, 'success');
                 }
             } catch (error) {
                 console.error('Command execution error:', error);
-                result.innerHTML = `<div style="color: #dc2626;"><strong>❌ Error:</strong> ${error.message || 'Unknown error occurred'}</div>`;
+                addResult(`❌ ${error.message || 'Unknown error occurred'}`, 'error');
             }
             
             commandInput.value = '';
         }
         
+        // Quick actions
+        function quickAction(action) {
+            const actions = {
+                summarize: 'summarize this',
+                email: 'email this to team',
+                search: 'search for',
+                open: 'open chrome'
+            };
+            
+            commandInput.value = actions[action];
+            if (action === 'search') {
+                commandInput.focus();
+                commandInput.setSelectionRange(12, 12);
+            } else {
+                executeCommand();
+            }
+        }
+        
+        // Toggle voice input
+        function toggleVoice() {
+            isListening = !isListening;
+            
+            if (isListening) {
+                voiceButton.classList.add('listening');
+                glowRing.classList.add('listening');
+                addResult('🎤 Listening... (Click to stop)', 'warning');
+            } else {
+                voiceButton.classList.remove('listening');
+                glowRing.classList.remove('listening');
+                addResult('🎤 Voice input stopped', 'success');
+            }
+        }
+        
+        // Show clarification
         function showClarification(clarification, originalCommand) {
-            result.style.display = 'none';
-            confirmation.style.display = 'block';
+            confirmationArea.classList.add('active');
             
             let clarificationHtml = `
-                <div style="margin-bottom: 8px;"><strong>Original:</strong> "${originalCommand}"</div>
-                <div style="margin-bottom: 8px;"><strong>Clarified Intent:</strong> ${clarification.clarifiedIntent}</div>
-                <div style="margin-bottom: 8px;"><strong>Action Steps:</strong></div>
-                <ol style="margin: 0; padding-left: 20px;">
+                <div class="clarification-item">
+                    <div class="clarification-label">Original Command:</div>
+                    <div>"${originalCommand}"</div>
+                </div>
+                <div class="clarification-item">
+                    <div class="clarification-label">Clarified Intent:</div>
+                    <div>${clarification.clarifiedIntent}</div>
+                </div>
+                <div class="clarification-item">
+                    <div class="clarification-label">Action Steps:</div>
+                    <ol class="action-steps">
             `;
             
             clarification.actionSteps.forEach((step, index) => {
-                clarificationHtml += `<li style="margin-bottom: 4px;">${step}</li>`;
+                clarificationHtml += `<li>${step}</li>`;
             });
             
-            clarificationHtml += `</ol>`;
+            clarificationHtml += `</ol></div>`;
             
             if (clarification.context) {
-                clarificationHtml += `<div style="margin-top: 8px; font-size: 11px; color: #6b7280;"><strong>Context:</strong> ${clarification.context}</div>`;
+                clarificationHtml += `
+                    <div class="clarification-item">
+                        <div class="clarification-label">Context:</div>
+                        <div>${clarification.context}</div>
+                    </div>
+                `;
             }
             
             clarificationContent.innerHTML = clarificationHtml;
             confirmationInput.focus();
         }
         
+        // Confirm execution
         async function confirmExecution() {
             const userResponse = confirmationInput.value.trim().toLowerCase();
             
             if (!currentCommandState) {
-                result.style.display = 'block';
-                result.innerHTML = `<div style="color: #dc2626;"><strong>❌ Error:</strong> No command to confirm</div>`;
-                confirmation.style.display = 'none';
+                addResult('❌ No command to confirm', 'error');
                 return;
             }
             
@@ -332,61 +822,51 @@
                 );
                 
                 if (response && response.success && response.executed) {
-                    let resultHtml = `<div style="color: #059669;"><strong>✅ Executed Successfully!</strong></div>`;
+                    addResult('✅ Executed Successfully!', 'success');
                     
                     response.results.forEach((resultItem, index) => {
-                        resultHtml += `
-                            <div style="margin-top: 8px; padding: 8px; background: #f0f9ff; border-radius: 4px;">
-                                <strong>Step ${index + 1}:</strong> ${resultItem.step}<br>
-                                <strong>Result:</strong> ${resultItem.result}<br>
-                                <strong>Action:</strong> ${resultItem.actionType}
-                            </div>
-                        `;
+                        addResult(`
+                            <strong>Step ${index + 1}:</strong> ${resultItem.step}<br>
+                            <strong>Result:</strong> ${resultItem.result}<br>
+                            <strong>Action:</strong> ${resultItem.actionType}
+                        `, 'success');
                     });
-                    
-                    result.innerHTML = resultHtml;
                 } else if (response && response.success && !response.executed) {
-                    result.innerHTML = `<div style="color: #f59e0b;"><strong>⚠️ Cancelled:</strong> ${response.message}</div>`;
+                    addResult(`⚠️ ${response.message}`, 'warning');
                 } else {
-                    result.innerHTML = `<div style="color: #dc2626;"><strong>❌ Error:</strong> ${response.error || 'Execution failed'}</div>`;
+                    addResult(`❌ ${response.error || 'Execution failed'}`, 'error');
                 }
                 
-                confirmation.style.display = 'none';
-                result.style.display = 'block';
+                confirmationArea.classList.remove('active');
                 currentCommandState = null;
                 
             } catch (error) {
                 console.error('Confirmation error:', error);
-                result.style.display = 'block';
-                result.innerHTML = `<div style="color: #dc2626;"><strong>❌ Error:</strong> ${error.message || 'Confirmation failed'}</div>`;
-                confirmation.style.display = 'none';
+                addResult(`❌ ${error.message || 'Confirmation failed'}`, 'error');
             }
         }
         
+        // Modify prompt
         function modifyPrompt() {
-            confirmation.style.display = 'none';
-            result.style.display = 'none';
+            confirmationArea.classList.remove('active');
             commandInput.focus();
             currentCommandState = null;
         }
         
-        // Add keyboard listener for confirmation input
-        confirmationInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                confirmExecution();
-            } else if (e.key === 'Escape') {
-                modifyPrompt();
-            }
-        });
-        
-        // Listen for global shortcuts via IPC
-        if (window.electronAPI) {
-            window.electronAPI.getAppStatus().then(status => {
-                console.log('App status:', status);
-            });
+        // Add result to results area
+        function addResult(content, type = 'success') {
+            const resultItem = document.createElement('div');
+            resultItem.className = `result-item result-${type}`;
+            resultItem.innerHTML = content;
+            
+            resultsArea.appendChild(resultItem);
+            resultsArea.scrollTop = resultsArea.scrollHeight;
         }
         
-        console.log('DELO Orb fallback loaded successfully!');
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initDELO);
+        
+        console.log('DELO with Cluely-style UI loaded successfully!');
     </script>
 </body>
 </html> 
