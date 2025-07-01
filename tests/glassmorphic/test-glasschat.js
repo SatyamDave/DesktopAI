@@ -31,7 +31,7 @@ function createGlassChatWindow() {
     }
   });
 
-  const url = 'http://localhost:3006?glasschat=true';
+  const url = 'http://localhost:3001?glasschat=true';
   console.log('🌐 Loading URL:', url);
   
   testWindow.loadURL(url);

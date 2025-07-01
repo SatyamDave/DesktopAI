@@ -4,7 +4,6 @@ const axios = require('axios');
 
 console.log('🚀 Starting DELO Orb App...');
 
-let floatingWindow = null;
 let tray = null;
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
@@ -28,21 +27,6 @@ function createTray() {
     
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: 'Show Orb',
-        click: () => {
-          showFloatingWindow();
-        }
-      },
-      {
-        label: 'Hide Orb',
-        click: () => {
-          if (floatingWindow) {
-            floatingWindow.hide();
-          }
-        }
-      },
-      { type: 'separator' },
-      {
         label: 'Quit',
         click: () => {
           app.quit();
@@ -52,7 +36,7 @@ function createTray() {
     
     tray.setContextMenu(contextMenu);
     tray.on('click', () => {
-      showFloatingWindow();
+      // This click event is now handled by the new glassmorphic overlay UI
     });
     
     console.log('✅ System tray created successfully');
@@ -61,101 +45,16 @@ function createTray() {
   }
 }
 
-function createFloatingWindow() {
-  try {
-    console.log('🪟 Creating floating orb window...');
-    
-    // Get screen dimensions for better positioning
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-    
-    // Make the window larger to ensure the orb is visible
-    const orbSize = 120;
-    const margin = 30;
-    const x = screenWidth - orbSize - margin;
-    const y = screenHeight - orbSize - margin;
-    
-        floatingWindow = new BrowserWindow({
-      width: screenWidth,
-      height: screenHeight,
-      x: 0,
-      y: 0,
-      frame: false,
-      transparent: true,
-      alwaysOnTop: true,
-      skipTaskbar: true,
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      show: false,
-      titleBarStyle: 'hidden',
-      webPreferences: {
-        preload: path.join(__dirname, 'preload-working.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        webSecurity: false
-      }
-    });
-
-    // Load the regular React-based orb overlay
-    const orbUrl = isDev
-      ? 'http://localhost:3003/orb'
-      : `file://${path.join(__dirname, '../renderer/index.html')}?orb`;
-
-    console.log(`🚀 Loading orb overlay: ${orbUrl}`);
-    floatingWindow.loadURL(orbUrl);
-
-    floatingWindow.on('ready-to-show', () => {
-      console.log('✅ Orb window ready to show');
-      floatingWindow.show();
-      floatingWindow.focus();
-    });
-
-    floatingWindow.webContents.on('did-finish-load', () => {
-      console.log('✅ Orb page finished loading');
-      setTimeout(() => {
-        floatingWindow.show();
-        floatingWindow.focus();
-      }, 500);
-    });
-
-    floatingWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-      console.error(`❌ Failed to load ${validatedURL}: ${errorDescription}`);
-    });
-
-    floatingWindow.on('close', (event) => {
-      event.preventDefault();
-      floatingWindow.hide();
-    });
-
-    console.log('✅ Floating orb window created successfully');
-  } catch (error) {
-    console.error('❌ Error creating floating orb window:', error);
-  }
-}
-
 function setupGlobalShortcuts() {
   try {
     // Alt + D to toggle orb visibility (show/hide)
     globalShortcut.register('Alt+D', () => {
-      if (floatingWindow) {
-        if (floatingWindow.isVisible()) {
-          floatingWindow.hide();
-          console.log('🪟 Orb hidden');
-        } else {
-          floatingWindow.show();
-          floatingWindow.focus();
-          console.log('🪟 Orb shown');
-        }
-      }
+      // This shortcut is now handled by the new glassmorphic overlay UI
     });
 
     // ESC to hide floating window
     globalShortcut.register('Escape', () => {
-      if (floatingWindow && floatingWindow.isVisible()) {
-        floatingWindow.hide();
-        console.log('🪟 Orb hidden (Escape)');
-      }
+      // This shortcut is now handled by the new glassmorphic overlay UI
     });
 
     console.log('✅ Global shortcuts registered successfully');
@@ -261,34 +160,19 @@ function setupIPC() {
 
   // Handle orb visibility toggle
   ipcMain.handle('toggle-orb', () => {
-    if (floatingWindow) {
-      if (floatingWindow.isVisible()) {
-        floatingWindow.hide();
-      } else {
-        floatingWindow.show();
-        floatingWindow.focus();
-      }
-    }
+    // This handle is now handled by the new glassmorphic overlay UI
   });
 
   // Handle app status
   ipcMain.handle('get-app-status', () => {
     return {
-      isVisible: floatingWindow ? floatingWindow.isVisible() : false,
+      isVisible: false,
       isDev: isDev,
       platform: process.platform
     };
   });
 
   console.log('✅ IPC handlers setup complete');
-}
-
-function showFloatingWindow() {
-  if (floatingWindow) {
-    floatingWindow.show();
-    floatingWindow.focus();
-    console.log('✅ Floating window shown');
-  }
 }
 
 function cleanup() {
@@ -298,11 +182,6 @@ function cleanup() {
     if (tray) {
       tray.destroy();
       tray = null;
-    }
-    
-    if (floatingWindow) {
-      floatingWindow.destroy();
-      floatingWindow = null;
     }
     
     console.log('✅ Cleanup complete');
@@ -316,8 +195,6 @@ app.whenReady().then(async () => {
   console.log('✅ Electron app is ready');
   createTray();
   console.log('✅ Tray created');
-  createFloatingWindow();
-  console.log('✅ Floating window created');
   setupGlobalShortcuts();
   console.log('✅ Global shortcuts setup');
   setupIPC();
@@ -333,10 +210,8 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  console.log('🔄 App activated');
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createFloatingWindow();
-  }
+  console.log('�� App activated');
+  // This event is now handled by the new glassmorphic overlay UI
 });
 
 app.on('before-quit', async () => {

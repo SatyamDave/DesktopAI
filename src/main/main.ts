@@ -388,7 +388,7 @@ class DoppelApp {
       });
 
       // Load the glassmorphic chat UI
-      const url = this.isDev ? 'http://localhost:3006?glasschat=true' : `file://${path.join(__dirname, '../renderer/index.html')}?glasschat=true`;
+      const url = this.isDev ? 'http://localhost:3001?glasschat=true' : `file://${path.join(__dirname, '../../dist/renderer/index.html')}?glasschat=true`;
       console.log(`🚀 Loading glassmorphic chat UI: ${url}`);
       
       this.floatingWindow.loadURL(url);
@@ -891,7 +891,7 @@ class DoppelApp {
 
     const url = this.isDev 
       ? 'http://localhost:3003/command' 
-      : `file://${path.join(__dirname, '../renderer/index.html')}#/command`;
+      : `file://${path.join(__dirname, '../../dist/renderer/index.html')}#/command`;
     
     commandWindow.loadURL(url);
   }
@@ -925,7 +925,7 @@ class DoppelApp {
 
       const url = this.isDev 
         ? 'http://localhost:3003/settings' 
-        : `file://${path.join(__dirname, '../renderer/index.html')}#/settings`;
+        : `file://${path.join(__dirname, '../../dist/renderer/index.html')}#/settings`;
       
       this.mainWindow.loadURL(url);
     } else {
@@ -990,7 +990,7 @@ class DoppelApp {
       overlayWin.setIgnoreMouseEvents(false);
       const url = this.isDev
         ? 'http://localhost:3000/overlay'
-        : `file://${path.join(__dirname, '../renderer/index.html')}?overlay`;
+        : `file://${path.join(__dirname, '../../dist/renderer/index.html')}?overlay`;
       overlayWin.loadURL(url);
       overlayWin.on('blur', () => {
         overlayWin?.hide();

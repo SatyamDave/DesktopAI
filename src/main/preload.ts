@@ -25,7 +25,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   moveWindow: (x: number, y: number) => ipcRenderer.send('move-window', x, y),
   resizeWindow: (width: number, height: number) => ipcRenderer.send('resize-window', width, height),
   getEmailDraftHistory: (limit?: number) => ipcRenderer.invoke('get-email-draft-history', limit),
-<<<<<<< HEAD
   getConversationHistory: (limit?: number) => ipcRenderer.invoke('get-conversation-history', limit),
   onOverlayAria: (callback: (event: any, msg: string) => void) => {
     ipcRenderer.on('overlay-aria', callback);
@@ -34,28 +33,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeListener('overlay-aria', callback);
   },
   toggleOverlay: () => ipcRenderer.invoke('toggle-overlay'),
-=======
-  
   // Real-time AI assistant methods
   processRealTimeCommand: (command: string) => ipcRenderer.invoke('process-real-time-command', command),
   getSystemStatus: () => ipcRenderer.invoke('get-system-status'),
   toggleVoiceListening: (enabled: boolean) => ipcRenderer.invoke('toggle-voice-listening', enabled),
   getVoiceStatus: () => ipcRenderer.invoke('get-voice-status'),
-  
   // Local LLM management
   getAvailableModels: () => ipcRenderer.invoke('get-available-models'),
   setActiveModel: (modelName: string) => ipcRenderer.invoke('set-active-model', modelName),
   testModel: (modelName: string) => ipcRenderer.invoke('test-model', modelName),
-  
   // System control methods
   getActiveWindow: () => ipcRenderer.invoke('get-active-window'),
   takeScreenshot: (region?: any) => ipcRenderer.invoke('take-screenshot', region),
   extractTextFromScreenshot: (capture?: any) => ipcRenderer.invoke('extract-text-from-screenshot', capture),
-  
   // Action handler management
   getActionHandlers: () => ipcRenderer.invoke('get-action-handlers'),
   clearCommandQueue: () => ipcRenderer.invoke('clear-command-queue'),
-  
   // DELO Command System methods
   processDeloCommand: (command: string) => ipcRenderer.invoke('process-delo-command', command),
   getDeloSuggestions: () => ipcRenderer.invoke('get-delo-suggestions'),
@@ -83,16 +76,13 @@ contextBridge.exposeInMainWorld('deloAI', {
   getVoiceState: () => ipcRenderer.invoke('delo-get-voice-state'),
   getVoiceConfig: () => ipcRenderer.invoke('delo-get-voice-config'),
   updateVoiceConfig: (config: any) => ipcRenderer.invoke('delo-update-voice-config', config),
-  
   // Workflow Management
   getWorkflows: () => ipcRenderer.invoke('delo-get-workflows'),
   createWorkflow: (workflowData: any) => ipcRenderer.invoke('delo-create-workflow', workflowData),
   executeWorkflow: (workflowId: string) => ipcRenderer.invoke('delo-execute-workflow', workflowId),
-  
   // Pattern Detection & Suggestions
   getWorkflowSuggestions: () => ipcRenderer.invoke('delo-get-workflow-suggestions'),
   getUserBehavior: () => ipcRenderer.invoke('delo-get-user-behavior'),
-  
   // Voice Events
   onVoiceCommand: (callback: (command: any) => void) => {
     ipcRenderer.on('voice-command', (event, command) => callback(command));
@@ -112,16 +102,13 @@ contextBridge.exposeInMainWorld('deloSensory', {
   stopMonitoring: () => ipcRenderer.invoke('delo-stop-sensory-monitoring'),
   getSensoryContext: () => ipcRenderer.invoke('delo-get-sensory-context'),
   getRecentSensoryContexts: (count: number) => ipcRenderer.invoke('delo-get-recent-sensory-contexts', count),
-  
   // Intelligent Suggestions
   getActiveSuggestions: () => ipcRenderer.invoke('delo-get-active-suggestions'),
   getDetectedPatterns: () => ipcRenderer.invoke('delo-get-detected-patterns'),
-  
   // Configuration
   getSensoryState: () => ipcRenderer.invoke('delo-get-sensory-state'),
   getSensoryConfig: () => ipcRenderer.invoke('delo-get-sensory-config'),
   updateSensoryConfig: (config: any) => ipcRenderer.invoke('delo-update-sensory-config', config),
-  
   // Sensory Events
   onSensoryContext: (callback: (context: any) => void) => {
     ipcRenderer.on('sensory-context', (event, context) => callback(context));
@@ -138,5 +125,4 @@ contextBridge.exposeInMainWorld('deloSensory', {
   onUrgent: (callback: (data: any) => void) => {
     ipcRenderer.on('urgent', (event, data) => callback(data));
   }
->>>>>>> origin/main
 }); 

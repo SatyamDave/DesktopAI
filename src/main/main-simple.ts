@@ -60,7 +60,7 @@ class SimpleGlassmorphicApp {
     });
 
     // Load the glassmorphic chat UI
-    const url = this.isDev ? 'http://localhost:3006?glasschat=true' : `file://${path.join(__dirname, '../renderer/index.html')}?glasschat=true`;
+    const url = this.isDev ? 'http://localhost:3001?glasschat=true' : `file://${path.join(__dirname, '../renderer/index.html')}?glasschat=true`;
     console.log('🚀 Loading URL:', url);
     
     this.mainWindow.loadURL(url);

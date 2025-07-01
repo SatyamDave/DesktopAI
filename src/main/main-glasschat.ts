@@ -63,7 +63,7 @@ class GlassChatApp {
       });
 
       // Use the correct port that Vite is running on
-      const url = this.isDev ? 'http://localhost:3006?glasschat=true' : `file://${path.join(__dirname, '../renderer/index.html')}?glasschat=true`;
+      const url = this.isDev ? 'http://localhost:3001?glasschat=true' : `file://${path.join(__dirname, '../../dist/renderer/index.html')}?glasschat=true`;
       console.log(`🚀 Loading URL: ${url}`);
       
       this.mainWindow.loadURL(url);
@@ -199,7 +199,7 @@ class GlassChatApp {
         // Fallback
         return { success: false, error: 'Sorry, I could not understand or fulfill that command.' };
       } catch (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: (error as Error).message };
       }
     });
 
@@ -263,7 +263,7 @@ class GlassChatApp {
       }
       return 'Could not summarize clipboard.';
     } catch (e) {
-      return 'Error summarizing clipboard: ' + e.message;
+      return 'Error summarizing clipboard: ' + (e as Error).message;
     }
   }
 }

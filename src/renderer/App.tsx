@@ -4,7 +4,6 @@ import ChatBar from './components/ChatBar';
 import CommandInput from './components/CommandInput';
 import { DELOInterface } from './components/DELOInterface';
 import Settings from './components/Settings';
-import FloatingOrb from './components/FloatingOrb';
 import RealTimeOverlay from './components/RealTimeOverlay';
 import GlassmorphicOverlay from './components/GlassmorphicOverlay';
 

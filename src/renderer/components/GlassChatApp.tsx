@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import GlassChat from './components/GlassChat';
-import './App.css';
+import GlassChat from './GlassChat';
+import '../App.css';
 
 const GlassChatApp: React.FC = () => {
   const [isVisible, setIsVisible] = useState(true);
@@ -32,7 +32,9 @@ const GlassChatApp: React.FC = () => {
       if (deloMode) {
         // Send command to main process for automation
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), text: 'Processing automation...', type: 'system', timestamp: new Date(), isTyping: true }]);
-        const response = await window.electron.ipcRenderer.invoke('delo-command', { command: message });
+        // const response = await window.electron.ipcRenderer.invoke('delo-command', { command: message });
+        // Replaced with electronAPI.processAiInput for type safety and consistency
+        const response = await window.electronAPI.processAiInput(message);
         setMessages(prev => [
           ...prev.filter(m => !m.isTyping),
           {
@@ -119,8 +121,6 @@ const GlassChatApp: React.FC = () => {
         onClose={handleClose}
         isVisible={isVisible}
         onToggleVisibility={handleToggleVisibility}
-        messages={messages}
-        deloMode={deloMode}
       />
     </div>
   );

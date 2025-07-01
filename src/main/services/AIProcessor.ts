@@ -61,11 +61,6 @@ export class AIProcessor {
   private openaiEndpoint: string | null = null;
   private openaiDeployment: string | null = null;
   private geminiApiKey: string | null = null;
-<<<<<<< HEAD
-  private aiProcessorInitialized: boolean = false;
-  private whisperInitialized: boolean = false;
-  private whisperMode: any; // Assuming whisperMode is defined elsewhere in the file
-=======
   private azureOpenaiKey: string | null = null;
   private azureOpenaiEndpoint: string | null = null;
   private azureOpenaiDeployment: string | null = null;
@@ -74,7 +69,6 @@ export class AIProcessor {
   private conversationHistory: Conversation[] = [];
   private maxHistoryLength = 50;
   private isInitialized = false;
->>>>>>> origin/main
 
   constructor() {
     this.agenticCommandProcessor = agenticCommandProcessor;
@@ -116,13 +110,9 @@ export class AIProcessor {
     this.sqlJs = await initSqlJs();
     if (fs.existsSync(this.dbPath)) {
       const filebuffer = fs.readFileSync(this.dbPath);
-<<<<<<< HEAD
-      this.db = new this.sqlJS.Database(filebuffer);
+      this.db = new this.sqlJs.Database(filebuffer);
       // Ensure tables exist even in existing database
       this.initializeDatabase();
-=======
-      this.db = new this.sqlJs.Database(filebuffer);
->>>>>>> origin/main
     } else {
       this.db = new this.sqlJs.Database();
       this.initializeDatabase();
@@ -254,7 +244,6 @@ export class AIProcessor {
       
     } catch (error) {
       console.error('[AIProcessor] Error processing input:', error);
-<<<<<<< HEAD
       return 'I apologize, but I encountered an error processing your request. Please try again.';
     }
   }
@@ -332,9 +321,6 @@ export class AIProcessor {
     } catch (dbError) {
       console.warn('[AIProcessor] Failed to save email draft to database:', dbError);
       // Continue with email composition even if database save fails
-=======
-      return 'I encountered an error while processing your request. Please try again.';
->>>>>>> origin/main
     }
     
     await shell.openExternal(mailtoUrl);
@@ -352,13 +338,8 @@ export class AIProcessor {
         try {
           response = await this.callGeminiAPI(prompt);
           if (this.debug) console.log('[AIProcessor] Using Gemini API');
-<<<<<<< HEAD
         } catch (error: any) {
           if (this.debug) console.log('[AIProcessor] Gemini failed, trying OpenAI:', error.message);
-=======
-        } catch (error) {
-          if (this.debug) console.log('[AIProcessor] Gemini failed, trying OpenAI:', error instanceof Error ? error.message : 'Unknown error');
->>>>>>> origin/main
           if (this.openaiApiKey) {
             response = await this.callOpenAIAPI(prompt);
             if (this.debug) console.log('[AIProcessor] Using OpenAI API');
@@ -585,7 +566,6 @@ Respond with JSON in this format:
     return 'general';
   }
 
-<<<<<<< HEAD
   private validateEmailAddress(input: string): { hasValidEmail: boolean; emailAddress?: string; nameOnly?: string } {
     // Email regex pattern
     const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
@@ -626,10 +606,7 @@ Respond with JSON in this format:
     return { hasValidEmail: false };
   }
 
-  private generateAIResponse(input: string, commandResult: any, context?: any): string {
-=======
   private generateAIResponse(input: string, commandResult: any): string {
->>>>>>> origin/main
     if (commandResult.success) {
       // Command was executed successfully
       return commandResult.message;
@@ -785,32 +762,6 @@ Respond with JSON in this format:
     return this.emailService.getConfigurationStatus();
   }
 
-<<<<<<< HEAD
-  private async ensureWhisperModeInitialized(): Promise<void> {
-    if (process.env.DISABLE_WHISPER_MODE === 'true') {
-      console.log('🎤 Whisper mode disabled by environment variable');
-      return;
-    }
-    
-    if (!this.whisperInitialized) {
-      console.log('🎤 Initializing whisper mode on-demand...');
-      this.whisperInitialized = true;
-    }
-  }
-
-  private async ensureAIProcessorInitialized(): Promise<void> {
-    if (process.env.DISABLE_AI_PROCESSING === 'true') {
-      console.log('🤖 AI processor disabled by environment variable');
-      return;
-    }
-    
-    if (!this.aiProcessorInitialized) {
-      console.log('🤖 Initializing AI processor on-demand...');
-      this.aiProcessorInitialized = true;
-    }
-  }
-} 
-=======
   private async saveConversation(conversation: Conversation) {
     if (!this.db) await this.init();
     this.db!.run(
@@ -821,5 +772,4 @@ Respond with JSON in this format:
   }
 }
 
-export const aiProcessor = new AIProcessor(); 
->>>>>>> origin/main
+export const aiProcessor = new AIProcessor();
