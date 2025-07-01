@@ -352,28 +352,29 @@ class DoppelApp {
 
   private createFloatingWindow() {
     try {
-      console.log('🪟 Creating floating orb window...');
+      console.log('🪟 Creating glassmorphic chat window...');
       
       // Get screen dimensions for better positioning
       const primaryDisplay = screen.getPrimaryDisplay();
       const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
       
-      // Make the window larger to ensure the orb is visible
-      const orbSize = 120; // Increased from 80 to 120
-      const margin = 30; // Increased margin
-      const x = screenWidth - orbSize - margin;
-      const y = screenHeight - orbSize - margin;
+      // Create a proper sized window for the glassmorphic chat
+      const chatWidth = 400;
+      const chatHeight = 600;
+      const margin = 50;
+      const x = screenWidth - chatWidth - margin;
+      const y = screenHeight - chatHeight - margin;
       
       this.floatingWindow = new BrowserWindow({
-        width: orbSize,
-        height: orbSize,
+        width: chatWidth,
+        height: chatHeight,
         x: x,
         y: y,
         frame: false,
         transparent: true,
         alwaysOnTop: true,
         skipTaskbar: true,
-        resizable: false,
+        resizable: true,
         minimizable: false,
         maximizable: false,
         show: false, // Don't show until ready
@@ -386,21 +387,20 @@ class DoppelApp {
         }
       });
 
-      // Load the fallback HTML file directly for reliability
-      const fallbackPath = path.join(__dirname, '../../orb-fallback.html');
-      const url = `file://${fallbackPath}`;
-      console.log(`🚀 Loading fallback HTML: ${url}`);
+      // Load the glassmorphic chat UI
+      const url = this.isDev ? 'http://localhost:3006?glasschat=true' : `file://${path.join(__dirname, '../renderer/index.html')}?glasschat=true`;
+      console.log(`🚀 Loading glassmorphic chat UI: ${url}`);
       
       this.floatingWindow.loadURL(url);
 
       this.floatingWindow.on('ready-to-show', () => {
-        console.log('✅ Orb window ready to show');
+        console.log('✅ Glassmorphic chat window ready to show');
         this.floatingWindow?.show();
         this.floatingWindow?.focus();
       });
 
       this.floatingWindow.webContents.on('did-finish-load', () => {
-        console.log('✅ Orb page finished loading');
+        console.log('✅ Glassmorphic chat page finished loading');
         // Small delay to ensure everything is ready
         setTimeout(() => {
           this.floatingWindow?.show();
@@ -412,7 +412,7 @@ class DoppelApp {
         console.error(`❌ Failed to load ${validatedURL}: ${errorDescription}`);
         // Retry loading after a short delay
         setTimeout(() => {
-          console.log('🔄 Retrying to load orb window...');
+          console.log('🔄 Retrying to load glassmorphic chat window...');
           this.floatingWindow?.loadURL(url);
         }, 2000);
       });
@@ -422,9 +422,9 @@ class DoppelApp {
         this.floatingWindow?.hide();
       });
 
-      console.log('✅ Floating orb window created successfully');
+      console.log('✅ Glassmorphic chat window created successfully');
     } catch (error) {
-      console.error('❌ Error creating floating orb window:', error);
+      console.error('❌ Error creating glassmorphic chat window:', error);
     }
   }
 

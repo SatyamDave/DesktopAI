@@ -30,15 +30,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: transparent;
   overflow: hidden;
-  /* Ensure the body doesn't interfere with the orb */
-  pointer-events: none;
+  /* Ensure the body doesn't interfere with the glassmorphic UI */
+  pointer-events: auto;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
   background: transparent;
-  /* Allow pointer events on the root for the orb */
+  /* Allow pointer events on the root for the glassmorphic UI */
   pointer-events: auto;
 }
 
@@ -50,7 +50,7 @@ body {
   pointer-events: auto;
 }
 
-/* Floating orb animations */
+/* Glassmorphic chat animations */
 @keyframes breathe {
   0% { filter: brightness(1) blur(0.2px); }
   50% { filter: brightness(1.08) blur(0.5px); }
@@ -138,51 +138,51 @@ body {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
-/* Floating orb specific styles */
-.floating-orb {
+/* Glassmorphic chat UI specific styles */
+.glassmorphic-chat {
   box-shadow: 0 0 24px 4px #6366f1, 0 0 40px 8px #8b5cf6;
   background: linear-gradient(135deg, rgba(139,92,246,0.7) 0%, rgba(6,182,212,0.7) 100%);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   border: 2px solid rgba(255,255,255,0.18);
-  border-radius: 50%;
+  border-radius: 20px;
   transition: box-shadow 0.3s, filter 0.3s;
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 60px;
-  height: 60px;
+  width: 400px;
+  height: 500px;
   cursor: pointer;
   z-index: 9999;
 }
 
-.floating-orb:hover {
-  transform: scale(1.2);
+.glassmorphic-chat:hover {
+  transform: scale(1.02);
   box-shadow: 0 0 40px rgba(99, 102, 241, 0.8);
 }
 
-.floating-orb.active {
+.glassmorphic-chat.active {
   animation: pulse-glow 1s ease-in-out infinite;
 }
 
-/* Enhanced orb visibility */
-.floating-orb button {
+/* Enhanced glassmorphic chat visibility */
+.glassmorphic-chat button {
   pointer-events: auto !important;
   cursor: pointer !important;
   z-index: 10000 !important;
 }
 
-/* Ensure the orb is always on top */
-.floating-orb,
-.floating-orb * {
+/* Ensure the glassmorphic chat is always on top */
+.glassmorphic-chat,
+.glassmorphic-chat * {
   pointer-events: auto !important;
 }
 
 /* Responsive design */
 @media (max-width: 768px) {
-  .floating-orb {
-    width: 50px;
-    height: 50px;
+  .glassmorphic-chat {
+    width: 350px;
+    height: 450px;
     bottom: 15px;
     right: 15px;
   }
@@ -283,24 +283,24 @@ body, .glasschat-app, .glassmorphic, input, button {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
-/* Ensure the orb is always visible and clickable */
-.floating-orb-container {
+/* Ensure the glassmorphic chat is always visible and clickable */
+.glassmorphic-chat-container {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 64px;
-  height: 64px;
+  width: 400px;
+  height: 500px;
   z-index: 10000;
   pointer-events: auto;
 }
 
-/* Mode-specific orb styles */
-.orb-ultra-lightweight {
+/* Mode-specific glassmorphic chat styles */
+.glassmorphic-ultra-lightweight {
   background: linear-gradient(135deg, #10b981, #059669, #047857) !important;
   box-shadow: 0 0 24px 4px #10b981, 0 0 40px 8px #059669 !important;
 }
 
-.orb-emergency {
+.glassmorphic-emergency {
   background: linear-gradient(135deg, #ef4444, #dc2626, #b91c1c) !important;
   box-shadow: 0 0 24px 4px #ef4444, 0 0 40px 8px #dc2626 !important;
   animation: emergency-pulse 1s infinite !important;
@@ -311,8 +311,8 @@ body, .glasschat-app, .glassmorphic, input, button {
   z-index: auto;
 }
 
-.floating-orb,
-.floating-orb * {
+.glassmorphic-chat,
+.glassmorphic-chat * {
   z-index: 10000 !important;
 }
 

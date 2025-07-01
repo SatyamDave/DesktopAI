@@ -1,294 +1,169 @@
+import { app, BrowserWindow, globalShortcut, ipcMain, screen, Menu, Tray } from 'electron';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { app, BrowserWindow, globalShortcut, ipcMain, screen, Tray, Menu, nativeImage } from 'electron';
 
 console.log('Loading .env from:', path.resolve(__dirname, '../../.env'));
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 app.disableHardwareAcceleration();
 
-class SimpleOrbApp {
-  private floatingWindow: BrowserWindow | null = null;
+class SimpleGlassmorphicApp {
+  private mainWindow: BrowserWindow | null = null;
   private tray: Tray | null = null;
-  private isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  private isDev: boolean;
 
   constructor() {
-    console.log(`🔧 Development mode: ${this.isDev}`);
-    console.log(`📦 App packaged: ${app.isPackaged}`);
+    this.isDev = process.env.NODE_ENV === 'development';
     
-    this.initializeApp();
-  }
-
-  private async initializeApp() {
-    console.log('🚀 Starting SimpleOrbApp initialization...');
-    
-    app.whenReady().then(async () => {
-      console.log('✅ Electron app is ready');
-      this.createTray();
-      console.log('✅ Tray created');
-      this.createFloatingWindow();
-      console.log('✅ Floating window created');
+    app.whenReady().then(() => {
+      this.createWindow();
+      this.setupTray();
       this.setupGlobalShortcuts();
-      console.log('✅ Global shortcuts setup');
       this.setupIPC();
-      console.log('✅ IPC setup complete');
-      console.log('🎉 App initialization complete!');
     });
 
     app.on('window-all-closed', () => {
-      console.log('🔄 All windows closed');
       if (process.platform !== 'darwin') {
         app.quit();
       }
     });
 
     app.on('activate', () => {
-      console.log('🔄 App activated');
       if (BrowserWindow.getAllWindows().length === 0) {
-        this.createFloatingWindow();
+        this.createWindow();
+      }
+    });
+  }
+
+  private createWindow() {
+    console.log('🚀 Starting SimpleGlassmorphicApp initialization...');
+
+    const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+    console.log('📱 Screen dimensions:', { screenWidth, screenHeight });
+
+    // Create the main glassmorphic chat window
+    this.mainWindow = new BrowserWindow({
+      width: 400,
+      height: 600,
+      x: screenWidth - 420,
+      y: screenHeight - 620,
+      frame: false,
+      transparent: true,
+      resizable: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'preload-simple.js')
       }
     });
 
-    app.on('before-quit', async () => {
-      console.log('🛑 App quitting, starting cleanup...');
-      await this.cleanup();
+    // Load the glassmorphic chat UI
+    const url = this.isDev ? 'http://localhost:3006?glasschat=true' : `file://${path.join(__dirname, '../renderer/index.html')}?glasschat=true`;
+    console.log('🚀 Loading URL:', url);
+    
+    this.mainWindow.loadURL(url);
+
+    this.mainWindow.once('ready-to-show', () => {
+      console.log('✅ Glassmorphic chat window ready to show');
+      this.mainWindow?.show();
+    });
+
+    this.mainWindow.webContents.on('did-finish-load', () => {
+      console.log('✅ Glassmorphic chat page finished loading');
+    });
+
+    this.mainWindow.on('closed', () => {
+      this.mainWindow = null;
     });
   }
 
-  private createTray() {
-    try {
-      console.log('📱 Creating system tray...');
-      
-      // Create a simple icon for the tray
-      const iconPath = path.join(__dirname, '../../assets/vite.svg');
-      const icon = nativeImage.createFromPath(iconPath);
-      
-      this.tray = new Tray(icon);
-      this.tray.setToolTip('DELO AI Assistant');
-      
-      const contextMenu = Menu.buildFromTemplate([
-        {
-          label: 'Show Orb',
-          click: () => {
-            this.showFloatingWindow();
-          }
-        },
-        {
-          label: 'Hide Orb',
-          click: () => {
-            if (this.floatingWindow) {
-              this.floatingWindow.hide();
-            }
-          }
-        },
-        { type: 'separator' },
-        {
-          label: 'Quit',
-          click: () => {
-            app.quit();
-          }
+  private setupTray() {
+    console.log('📱 Creating system tray...');
+    
+    const trayIcon = path.join(__dirname, '../assets/tray-icon.png');
+    this.tray = new Tray(trayIcon);
+    
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Show Glassmorphic Chat',
+        click: () => {
+          this.mainWindow?.show();
         }
-      ]);
-      
-      this.tray.setContextMenu(contextMenu);
-      this.tray.on('click', () => {
-        this.showFloatingWindow();
-      });
-      
-      console.log('✅ System tray created successfully');
-    } catch (error) {
-      console.error('❌ Error creating system tray:', error);
-    }
-  }
-
-  private createFloatingWindow() {
-    try {
-      console.log('🪟 Creating floating orb window...');
-      
-      // Get screen dimensions for better positioning
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-      
-      // Make the window larger to ensure the orb is visible
-      const orbSize = 200; // Increased from 120 to 200
-      const margin = 50;
-      const x = screenWidth - orbSize - margin;
-      const y = screenHeight - orbSize - margin;
-      
-      this.floatingWindow = new BrowserWindow({
-        width: orbSize,
-        height: orbSize,
-        x: x,
-        y: y,
-        frame: false,
-        transparent: true,
-        alwaysOnTop: true,
-        skipTaskbar: true,
-        resizable: false,
-        minimizable: false,
-        maximizable: false,
-        show: false,
-        titleBarStyle: 'hidden',
-        webPreferences: {
-          preload: path.join(__dirname, 'preload-simple.js'),
-          contextIsolation: true,
-          nodeIntegration: false,
-          webSecurity: false
+      },
+      {
+        label: 'Hide Glassmorphic Chat',
+        click: () => {
+          this.mainWindow?.hide();
         }
-      });
+      },
+      { type: 'separator' },
+      {
+        label: 'Quit',
+        click: () => {
+          app.quit();
+        }
+      }
+    ]);
 
-      // Load the fallback HTML file directly for reliability
-      const fallbackPath = path.join(__dirname, '../../orb-fallback.html');
-      const url = `file://${fallbackPath}`;
-      console.log(`🚀 Loading fallback HTML: ${url}`);
-      
-      this.floatingWindow.loadURL(url);
-
-      this.floatingWindow.on('ready-to-show', () => {
-        console.log('✅ Orb window ready to show');
-        this.floatingWindow?.show();
-        this.floatingWindow?.focus();
-      });
-
-      this.floatingWindow.webContents.on('did-finish-load', () => {
-        console.log('✅ Orb page finished loading');
-        setTimeout(() => {
-          this.floatingWindow?.show();
-          this.floatingWindow?.focus();
-        }, 500);
-      });
-
-      this.floatingWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-        console.error(`❌ Failed to load ${validatedURL}: ${errorDescription}`);
-        setTimeout(() => {
-          console.log('🔄 Retrying to load orb window...');
-          this.floatingWindow?.loadURL(url);
-        }, 2000);
-      });
-
-      this.floatingWindow.on('close', (event) => {
-        event.preventDefault();
-        this.floatingWindow?.hide();
-      });
-
-      console.log('✅ Floating orb window created successfully');
-    } catch (error) {
-      console.error('❌ Error creating floating orb window:', error);
-    }
+    this.tray.setContextMenu(contextMenu);
+    this.tray.setToolTip('Glassmorphic Chat AI');
+    console.log('✅ System tray created successfully');
   }
 
   private setupGlobalShortcuts() {
-    try {
-      // Alt + D to toggle orb visibility (show/hide)
-      globalShortcut.register('Alt+D', () => {
-        if (this.floatingWindow) {
-          if (this.floatingWindow.isVisible()) {
-            this.floatingWindow.hide();
-            console.log('🪟 Orb hidden');
-          } else {
-            this.floatingWindow.show();
-            this.floatingWindow.focus();
-            console.log('🪟 Orb shown');
-          }
-        }
-      });
+    console.log('⌨️ Setting up global shortcuts...');
+    
+    // Ctrl+Shift+G to toggle glassmorphic chat visibility
+    globalShortcut.register('CommandOrControl+Shift+G', () => {
+      if (this.mainWindow?.isVisible()) {
+        this.mainWindow.hide();
+        console.log('🪟 Glassmorphic chat hidden');
+      } else {
+        this.mainWindow?.show();
+        console.log('🪟 Glassmorphic chat shown');
+      }
+    });
 
-      // ESC to hide floating window
-      globalShortcut.register('Escape', () => {
-        if (this.floatingWindow?.isVisible()) {
-          this.floatingWindow.hide();
-          console.log('🪟 Orb hidden (Escape)');
-        }
-      });
+    // Escape to hide glassmorphic chat
+    globalShortcut.register('Escape', () => {
+      if (this.mainWindow?.isVisible()) {
+        this.mainWindow.hide();
+        console.log('🪟 Glassmorphic chat hidden (Escape)');
+      }
+    });
 
-      console.log('✅ Global shortcuts registered successfully');
-    } catch (error) {
-      console.error('❌ Error setting up global shortcuts:', error);
-    }
+    console.log('✅ Global shortcuts registered successfully');
   }
 
   private setupIPC() {
-    // Handle simple command execution
-    ipcMain.handle('execute-command', async (event, command: string) => {
-      try {
-        console.log(`🎯 Executing command: "${command}"`);
-        return { 
-          success: true, 
-          result: `Command executed: ${command}`,
-          data: { type: 'command' }
-        };
-      } catch (error) {
-        console.error('❌ Command execution error:', error);
-        return { success: false, error: (error as Error).message };
+    console.log('🔌 Setting up IPC handlers...');
+
+    // Handle glassmorphic chat visibility toggle
+    ipcMain.handle('toggle-glassmorphic-chat', () => {
+      if (this.mainWindow?.isVisible()) {
+        this.mainWindow.hide();
+        return { visible: false };
+      } else {
+        this.mainWindow?.show();
+        return { visible: true };
       }
     });
 
-    // Handle AI processing (simplified)
-    ipcMain.handle('process-ai-input', async (event, input: string) => {
-      try {
-        console.log(`🤖 Processing AI input: "${input}"`);
-        return { 
-          success: true, 
-          result: `I understand: ${input}. How can I help you?`
-        };
-      } catch (error) {
-        console.error('❌ AI processing error:', error);
-        return { success: false, error: (error as Error).message };
-      }
+    // Handle window movement
+    ipcMain.handle('move-window', (event, x: number, y: number) => {
+      this.mainWindow?.setPosition(x, y);
     });
 
-    // Handle orb visibility toggle
-    ipcMain.handle('toggle-orb', () => {
-      if (this.floatingWindow) {
-        if (this.floatingWindow.isVisible()) {
-          this.floatingWindow.hide();
-        } else {
-          this.floatingWindow.show();
-          this.floatingWindow.focus();
-        }
-      }
-    });
-
-    // Handle app status
-    ipcMain.handle('get-app-status', () => {
-      return {
-        isVisible: this.floatingWindow?.isVisible() || false,
-        isDev: this.isDev,
-        platform: process.platform
-      };
+    // Handle window resizing
+    ipcMain.handle('resize-window', (event, width: number, height: number) => {
+      this.mainWindow?.setSize(width, height);
     });
 
     console.log('✅ IPC handlers setup complete');
   }
-
-  private async cleanup() {
-    try {
-      console.log('🧹 Starting cleanup...');
-      
-      if (this.tray) {
-        this.tray.destroy();
-        this.tray = null;
-      }
-      
-      if (this.floatingWindow) {
-        this.floatingWindow.destroy();
-        this.floatingWindow = null;
-      }
-      
-      console.log('✅ Cleanup complete');
-    } catch (error) {
-      console.error('❌ Error during cleanup:', error);
-    }
-  }
-
-  private showFloatingWindow() {
-    if (this.floatingWindow) {
-      this.floatingWindow.show();
-      this.floatingWindow.focus();
-      console.log('✅ Floating window shown');
-    }
-  }
 }
 
-// Start the app
-new SimpleOrbApp(); 
+// Start the application
+new SimpleGlassmorphicApp(); 
