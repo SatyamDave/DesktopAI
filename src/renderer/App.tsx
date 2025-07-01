@@ -7,9 +7,6 @@ import Settings from './components/Settings';
 import FloatingOrb from './components/FloatingOrb';
 import RealTimeOverlay from './components/RealTimeOverlay';
 
-<<<<<<< HEAD
-console.log('🚀 Renderer App.tsx loading...');
-=======
 interface Message {
   id: string;
   text: string;
@@ -28,7 +25,6 @@ interface AppState {
   currentMode: 'chat' | 'command' | 'delo' | 'realtime';
   theme: 'light' | 'dark' | 'auto';
 }
->>>>>>> origin/main
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -157,22 +153,6 @@ const App: React.FC = () => {
   };
 
   return (
-<<<<<<< HEAD
-    <div className="app">
-      <AnimatePresence>
-        {!showChatBar && (
-          <FloatingOrb key="orb" onClick={() => setShowChatBar(true)} />
-        )}
-        {showChatBar && (
-          <ChatBar key="chatbar" onClose={() => setShowChatBar(false)} />
-        )}
-      </AnimatePresence>
-      
-      {/* Show ultra-lightweight mode indicator */}
-      {isUltraLightweight && (
-        <div className="ultra-lightweight-indicator">
-          ⚡ Ultra-Lightweight Mode
-=======
     <div 
       className={`app ${state.theme} ${isDragging ? 'dragging' : ''}`}
       style={{
@@ -186,7 +166,6 @@ const App: React.FC = () => {
           <div className="control close"></div>
           <div className="control minimize"></div>
           <div className="control maximize"></div>
->>>>>>> origin/main
         </div>
         <div className="header-title">
           <span className="app-icon">🤖</span>
@@ -215,76 +194,30 @@ const App: React.FC = () => {
             className={`mode-button ${state.currentMode === 'realtime' ? 'active' : ''}`}
             onClick={() => toggleMode('realtime')}
           >
-            👁️
+            ⚡
           </button>
           <button className="theme-toggle" onClick={toggleTheme}>
-            {state.theme === 'dark' ? '☀️' : '🌙'}
-          </button>
-          <button className="settings-button" onClick={() => setState(prev => ({ ...prev, showSettings: !prev.showSettings }))}>
-            ⚙️
+            {state.theme === 'light' ? '🌞' : state.theme === 'dark' ? '🌙' : '🌓'}
           </button>
         </div>
       </div>
-
       {/* Main content area */}
       <div className="app-content">
         {state.currentMode === 'chat' && (
-          <div className="chat-container">
-            <div className="messages-container">
-              {state.messages.map((message) => (
-                <div key={message.id} className={`message ${message.type}`}>
-                  <div className="message-content">
-                    <div className="message-text">{message.text}</div>
-                    <div className="message-time">
-                      {message.timestamp.toLocaleTimeString()}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {state.isProcessing && (
-                <div className="message assistant">
-                  <div className="message-content">
-                    <div className="typing-indicator">
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-            <ChatBar />
-          </div>
+          <ChatBar onClose={() => {}} />
         )}
-
         {state.currentMode === 'command' && (
-          <div className="command-container">
-            <CommandInput />
-          </div>
+          <CommandInput onCommand={handleCommand} />
         )}
-
         {state.currentMode === 'delo' && (
-          <div className="delo-container">
-            <DELOInterface />
-          </div>
+          <DELOInterface onCommand={handleDELOCommand} />
         )}
-
         {state.currentMode === 'realtime' && (
-          <div className="realtime-container">
-            <RealTimeOverlay />
-          </div>
-        )}
-
-        {state.showSettings && (
-          <div className="settings-overlay">
-            <Settings />
-          </div>
+          <RealTimeOverlay />
         )}
       </div>
-
-      {/* Floating orb for quick access */}
-      <FloatingOrb />
+      {/* Ultra-lightweight mode indicator (if needed) */}
+      {/* <div className="ultra-lightweight-indicator">⚡ Ultra-Lightweight Mode</div> */}
     </div>
   );
 };
