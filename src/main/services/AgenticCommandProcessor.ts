@@ -7,6 +7,7 @@ import { promisify } from 'util';
 import { configManager } from './ConfigManager';
 import { browserAutomationService } from './BrowserAutomationService';
 import { appLaunchService } from './AppLaunchService';
+import { webService } from './WebService';
 
 const execAsync = promisify(exec);
 
@@ -29,6 +30,7 @@ export class AgenticCommandProcessor {
   private configManager: typeof configManager;
   private browserAutomationService: typeof browserAutomationService;
   private appLaunchService: typeof appLaunchService;
+  private webService: typeof webService;
   private debug: boolean;
   private userPreferences: Map<string, string> = new Map();
 
@@ -88,6 +90,7 @@ export class AgenticCommandProcessor {
     this.configManager = configManager;
     this.browserAutomationService = browserAutomationService;
     this.appLaunchService = appLaunchService;
+    this.webService = webService;
     this.debug = process.env.DEBUG_MODE === 'true';
     this.loadUserPreferences();
   }
@@ -329,9 +332,14 @@ export class AgenticCommandProcessor {
   private async handleYouTubeSearch(data: any, originalInput: string): Promise<CommandResult> {
     const { query } = data;
     this.log(`Performing YouTube search for: ${query}`);
-    
-    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-    return await this.openWebUrl(searchUrl, `Searching YouTube for: ${query}`);
+    try {
+      const message = await webService.openYouTubeSearch(query, /* autoPlay */ true);
+      return { success: true, message };
+    } catch (err) {
+      this.log('WebService failed, falling back to browser open', err);
+      const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+      return await this.openWebUrl(searchUrl, `Searching YouTube for: ${query}`);
+    }
   }
 
   private async handleEmailComposition(data: any, originalInput: string): Promise<CommandResult> {
