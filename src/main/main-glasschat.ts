@@ -62,8 +62,8 @@ class GlassChatApp {
         }
       });
 
-      // Use the correct port that Vite is running on
-      const url = this.isDev ? 'http://localhost:3001?glasschat=true' : `file://${path.join(__dirname, '../../dist/renderer/index.html')}?glasschat=true`;
+      // Always load the built renderer file
+      const url = `file://${path.join(__dirname, '../../dist/renderer/index.html')}?glasschat=true`;
       console.log(`🚀 Loading URL: ${url}`);
       
       this.mainWindow.loadURL(url);
