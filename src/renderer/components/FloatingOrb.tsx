@@ -1,35 +1,16 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 interface FloatingOrbProps {
-  onClick?: () => void;
+  onClick?: (position: { x: number; y: number }) => void;
   isUltraLightweight?: boolean;
   emergencyMode?: boolean;
 }
 
 const FloatingOrb: React.FC<FloatingOrbProps> = ({ onClick, isUltraLightweight = false, emergencyMode = false }) => {
   const orbRef = useRef<HTMLButtonElement>(null);
-  const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  // On drag start, record the offset between mouse and window
-  const handleDragStart = (event: any, info: any) => {
-    // Get the current window position from the OS
-    window.electronAPI?.moveWindow && window.electronAPI.moveWindow(window.screenX, window.screenY);
-    dragOffset.current = {
-      x: info.point.x,
-      y: info.point.y,
-    };
-  };
-
-  // On drag, move the window
-  const handleDrag = (event: any, info: any) => {
-    // Calculate new window position
-    const dx = info.point.x - dragOffset.current.x;
-    const dy = info.point.y - dragOffset.current.y;
-    const newX = window.screenX + dx;
-    const newY = window.screenY + dy;
-    window.electronAPI?.moveWindow && window.electronAPI.moveWindow(newX, newY);
-  };
+  const [position, setPosition] = useState({ x: 60, y: 60 }); // Center the orb in the window
+  const [isDragging, setIsDragging] = useState(false);
 
   // Determine orb styling based on mode
   const getOrbStyling = () => {
@@ -58,69 +39,122 @@ const FloatingOrb: React.FC<FloatingOrbProps> = ({ onClick, isUltraLightweight =
 
   const orbStyle = getOrbStyling();
 
+  const handleDragStart = (event: any, info: any) => {
+    setIsDragging(true);
+    console.log('🪟 Orb drag started');
+  };
+
+  const handleDrag = (event: any, info: any) => {
+    // Update local position state - use absolute coordinates with bounds checking
+    const x = Math.max(0, Math.min(window.innerWidth - 80, info.point.x));
+    const y = Math.max(0, Math.min(window.innerHeight - 80, info.point.y));
+    setPosition({ x, y });
+  };
+
+  const handleDragEnd = (event: any, info: any) => {
+    setIsDragging(false);
+    console.log('🪟 Orb drag ended at:', info.point);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isDragging && onClick) {
+      onClick(position);
+    }
+  };
+
+  // Add debugging
+  useEffect(() => {
+    console.log('🪟 FloatingOrb mounted with position:', position);
+    console.log('🪟 Window dimensions:', { width: window.innerWidth, height: window.innerHeight });
+  }, []);
+
   return (
     <motion.button
       ref={orbRef}
       type="button"
       aria-label="Open AI Assistant"
       tabIndex={0}
-      className="fixed bottom-6 right-6 outline-none focus:ring-2 focus:ring-violet-400 pointer-events-auto z-50"
-      style={{ touchAction: 'none' }}
-      initial={{ scale: 1, opacity: 0 }}
+      className="fixed outline-none focus:ring-2 focus:ring-violet-400 pointer-events-auto z-50"
+      style={{ 
+        touchAction: 'none',
+        left: position.x,
+        top: position.y,
+        pointerEvents: 'auto'
+      }}
+      initial={{ scale: 0, opacity: 0 }}
       animate={{ 
         scale: 1, 
         opacity: 1,
         boxShadow: orbStyle.shadow
       }}
       transition={{
-        duration: 0.5,
-        ease: "easeOut"
+        duration: 0.6,
+        ease: "easeOut",
+        type: "spring",
+        stiffness: 200,
+        damping: 20
       }}
       whileHover={{
-        scale: 1.15,
+        scale: 1.2,
         boxShadow: orbStyle.hoverShadow,
-        filter: 'brightness(1.2)'
+        filter: 'brightness(1.3)'
       }}
       whileFocus={{
-        scale: 1.15,
+        scale: 1.2,
         boxShadow: orbStyle.hoverShadow,
-        filter: 'brightness(1.2)'
+        filter: 'brightness(1.3)'
       }}
       whileTap={{
-        scale: 0.95
+        scale: 0.9
       }}
       drag
       dragMomentum={false}
       dragElastic={0.1}
-      dragConstraints={false}
+      dragConstraints={{
+        left: 0,
+        right: window.innerWidth - 80,
+        top: 0,
+        bottom: window.innerHeight - 80
+      }}
       onDragStart={handleDragStart}
       onDrag={handleDrag}
-      onClick={onClick}
+      onDragEnd={handleDragEnd}
+      onClick={handleClick}
     >
       <span
-        className="block w-16 h-16 rounded-full backdrop-blur-md bg-opacity-80 border border-white/40 shadow-lg flex items-center justify-center select-none"
+        className="block w-20 h-20 rounded-full backdrop-blur-md bg-opacity-95 border-4 border-white/30 shadow-2xl flex items-center justify-center select-none"
         style={{
           background: orbStyle.background,
           boxShadow: orbStyle.shadow,
+          filter: 'brightness(1.1)',
         }}
       >
         <span className="sr-only">Open AI Assistant</span>
         <svg
-          className="w-8 h-8 text-white opacity-90"
+          className="w-10 h-10 text-white opacity-95"
           fill="none"
           viewBox="0 0 32 32"
           aria-hidden="true"
         >
-          <circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="2.5" opacity="0.3" />
-          <circle cx="16" cy="16" r="7" fill="currentColor" opacity="0.3" />
-          <circle cx="16" cy="16" r="5" fill="currentColor" opacity="0.5" />
+          <circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="2.5" opacity="0.4" />
+          <circle cx="16" cy="16" r="7" fill="currentColor" opacity="0.4" />
+          <circle cx="16" cy="16" r="5" fill="currentColor" opacity="0.6" />
           <circle cx="16" cy="16" r="3" fill="currentColor" />
         </svg>
       </span>
       
+      {/* Glow effect */}
+      <div 
+        className="absolute inset-0 rounded-full blur-xl opacity-30"
+        style={{
+          background: orbStyle.background,
+          zIndex: -1
+        }}
+      />
+      
       {/* Mode indicator */}
       {(isUltraLightweight || emergencyMode) && (
-        <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-white border-2 border-gray-800 flex items-center justify-center">
+        <div className="absolute -top-3 -right-3 w-6 h-6 rounded-full bg-white border-2 border-gray-800 flex items-center justify-center shadow-lg">
           <span className="text-xs font-bold">
             {emergencyMode ? '🚨' : '⚡'}
           </span>

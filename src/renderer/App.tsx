@@ -1,249 +1,271 @@
-import React, { useState, useEffect } from 'react';
-import FloatingOrb from './components/FloatingOrb';
+import React, { useState, useEffect, useRef } from 'react';
+import './App.css';
 import ChatBar from './components/ChatBar';
+import CommandInput from './components/CommandInput';
+import { DELOInterface } from './components/DELOInterface';
+import Settings from './components/Settings';
+import FloatingOrb from './components/FloatingOrb';
 import RealTimeOverlay from './components/RealTimeOverlay';
-import { AnimatePresence } from 'framer-motion';
-import './index.css';
 
-declare global {
-  interface Window {
-    electronAPI: {
-      executeCommand: (command: string) => Promise<{ success: boolean; result?: string; error?: string; data?: any }>;
-      processAiInput: (input: string, context?: any) => Promise<{ success: boolean; result?: string; error?: string }>;
-      getCommandHistory: (limit?: number) => Promise<{ success: boolean; history?: any[]; error?: string }>;
-      getCommandSuggestions: (input: string) => Promise<{ success: boolean; suggestions?: string[]; error?: string }>;
-      executeCommandQueue: (commands: string[]) => Promise<{ success: boolean; results?: any[]; error?: string }>;
-      getClipboardHistory: () => Promise<any[]>;
-      pasteFromHistory: (index: number) => Promise<boolean>;
-      getUserContext: () => Promise<{
-        currentApp: string;
-        timeOfDay: string;
-        dayOfWeek: string;
-        recentApps: string[];
-        isInMeeting: boolean;
-      }>;
-      toggleWhisperMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
-      getAppStatus: () => Promise<{ success: boolean; status?: any; error?: string }>;
-      getPerformanceMetrics: () => Promise<{ 
-        success: boolean; 
-        metrics?: any; 
-        systemInfo?: any; 
-        dbStats?: any; 
-        clipboardStats?: any; 
-        behaviorStats?: any; 
-        error?: string 
-      }>;
-      optimizePerformance: (mode: 'low' | 'high') => Promise<{ success: boolean; mode?: string; error?: string }>;
-      getPerformanceHistory: () => Promise<{ success: boolean; metrics?: any[]; error?: string }>;
-      getEmergencyStatus: () => Promise<{ 
-        success: boolean; 
-        status?: {
-          isEmergencyMode: boolean;
-          currentMemory: number;
-          currentCpu: number;
-          currentDiskIO: number;
-        }; 
-        error?: string 
-      }>;
-      forceEmergencyMode: () => Promise<{ success: boolean; error?: string }>;
-      onEmergencyMode: (callback: (isEmergency: boolean) => void) => void;
-      getEmailDraftHistory: (limit?: number) => Promise<{ success: boolean; history?: any[]; error?: string }>;
-      moveWindow: (x: number, y: number) => void;
-      resizeWindow: (width: number, height: number) => void;
-      // Real-time AI assistant methods
-      processRealTimeCommand: (command: string) => Promise<{
-        success: boolean;
-        intent: string;
-        confidence: number;
-        action: string;
-        response: string;
-        latency: number;
-      }>;
-      getSystemStatus: () => Promise<{
-        cpu: number;
-        memory: number;
-        activeModel: string;
-        queueLength: number;
-      }>;
-      toggleVoiceListening: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
-      getVoiceStatus: () => Promise<{ isListening: boolean; error?: string }>;
-      // DELO-specific methods
-      startScreenPerception: () => Promise<{ success: boolean; message: string }>;
-      stopScreenPerception: () => Promise<{ success: boolean; message: string }>;
-      getScreenSnapshots: (limit?: number) => Promise<{ success: boolean; snapshots: any[] }>;
-      addScreenFilter: (filter: any) => Promise<{ success: boolean; message: string }>;
-      startAudioPerception: () => Promise<{ success: boolean; message: string }>;
-      stopAudioPerception: () => Promise<{ success: boolean; message: string }>;
-      getAudioSessions: (limit?: number) => Promise<{ success: boolean; sessions: any[] }>;
-      searchAudioTranscripts: (query: string) => Promise<{ success: boolean; results: any[] }>;
-      addAudioFilter: (filter: any) => Promise<{ success: boolean; message: string }>;
-      startContextManager: () => Promise<{ success: boolean; message: string }>;
-      stopContextManager: () => Promise<{ success: boolean; message: string }>;
-      getContextSnapshots: (limit?: number) => Promise<{ success: boolean; snapshots: any[] }>;
-      addContextPattern: (pattern: any) => Promise<{ success: boolean; message: string }>;
-      setQuietHours: (startHour: number, endHour: number) => Promise<{ success: boolean; message: string }>;
-    };
-  }
+interface Message {
+  id: string;
+  text: string;
+  type: 'user' | 'assistant' | 'system';
+  timestamp: Date;
+  isTyping?: boolean;
 }
 
-console.log('🚀 Renderer App.tsx loading...');
+interface AppState {
+  messages: Message[];
+  isListening: boolean;
+  isProcessing: boolean;
+  showSettings: boolean;
+  showDELO: boolean;
+  showRealTime: boolean;
+  currentMode: 'chat' | 'command' | 'delo' | 'realtime';
+  theme: 'light' | 'dark' | 'auto';
+}
 
-function App() {
-  const [emergencyMode, setEmergencyMode] = useState(false);
-  const [isUltraLightweight, setIsUltraLightweight] = useState(false);
-  const [showChatBar, setShowChatBar] = useState(false);
-  const [showRealTimeOverlay, setShowRealTimeOverlay] = useState(false);
-  const [isVoiceListening, setIsVoiceListening] = useState(false);
+const App: React.FC = () => {
+  const [state, setState] = useState<AppState>({
+    messages: [],
+    isListening: false,
+    isProcessing: false,
+    showSettings: false,
+    showDELO: false,
+    showRealTime: false,
+    currentMode: 'chat',
+    theme: 'auto'
+  });
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 50, y: 50 });
 
   useEffect(() => {
-    if (showChatBar) {
-      window.electronAPI?.resizeWindow?.(420, 120);
-    } else if (showRealTimeOverlay) {
-      window.electronAPI?.resizeWindow?.(800, 600);
-    } else {
-      window.electronAPI?.resizeWindow?.(100, 100);
-    }
-  }, [showChatBar, showRealTimeOverlay]);
+    // Auto-scroll to bottom when new messages arrive
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [state.messages]);
 
   useEffect(() => {
-    console.log('✅ App component mounted');
-    
-    // Check for ultra-lightweight mode
-    const checkUltraLightweight = () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const isUltra = urlParams.get('ultra-lightweight') === 'true' || 
-                     import.meta.env.VITE_ULTRA_LIGHTWEIGHT === 'true';
-      setIsUltraLightweight(isUltra);
-      
-      if (isUltra) {
-        console.log('⚡ ULTRA-LIGHTWEIGHT MODE: Using minimal UI');
+    // Detect system theme preference
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleThemeChange = (e: MediaQueryListEvent) => {
+      if (state.theme === 'auto') {
+        document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
       }
     };
-    
-    checkUltraLightweight();
-    
-    // Set up event listeners
-    if (window.electronAPI) {
-      // Listen for emergency mode
-      window.electronAPI.onEmergencyMode?.((isEmergency: boolean) => {
-        console.log(`🚨 Emergency mode: ${isEmergency}`);
-        setEmergencyMode(isEmergency);
+
+    mediaQuery.addEventListener('change', handleThemeChange);
+    // Initial call
+    if (state.theme === 'auto') {
+      document.documentElement.setAttribute('data-theme', mediaQuery.matches ? 'dark' : 'light');
+    }
+
+    return () => mediaQuery.removeEventListener('change', handleThemeChange);
+  }, [state.theme]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleSendMessage = async (message: string) => {
+    if (!message.trim()) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text: message,
+      type: 'user',
+      timestamp: new Date()
+    };
+
+    setState(prev => ({
+      ...prev,
+      messages: [...prev.messages, userMessage],
+      isProcessing: true
+    }));
+
+    // Simulate AI response
+    setTimeout(() => {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: `I understand you said: "${message}". How can I help you with that?`,
+        type: 'assistant',
+        timestamp: new Date()
+      };
+
+      setState(prev => ({
+        ...prev,
+        messages: [...prev.messages, aiMessage],
+        isProcessing: false
+      }));
+    }, 1000);
+  };
+
+  const handleCommand = async (command: string) => {
+    console.log('Executing command:', command);
+    // Command execution logic here
+  };
+
+  const handleDELOCommand = async (command: string) => {
+    console.log('DELO command:', command);
+    // DELO command execution logic here
+  };
+
+  const toggleMode = (mode: AppState['currentMode']) => {
+    setState(prev => ({
+      ...prev,
+      currentMode: mode,
+      showSettings: false,
+      showDELO: mode === 'delo',
+      showRealTime: mode === 'realtime'
+    }));
+  };
+
+  const toggleTheme = () => {
+    setState(prev => {
+      const newTheme = prev.theme === 'light' ? 'dark' : prev.theme === 'dark' ? 'auto' : 'light';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      return { ...prev, theme: newTheme };
+    });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    const startX = e.clientX - position.x;
+    const startY = e.clientY - position.y;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setPosition({
+        x: e.clientX - startX,
+        y: e.clientY - startY
       });
-
-      // Initialize voice status
-      initializeVoiceStatus();
-    }
-    
-    return () => {
-      console.log('🔄 App component unmounting');
     };
-  }, []);
 
-  const initializeVoiceStatus = async () => {
-    try {
-      const status = await window.electronAPI?.getVoiceStatus?.();
-      if (status) {
-        setIsVoiceListening(status.isListening);
-      }
-    } catch (error) {
-      console.error('❌ Error getting voice status:', error);
-    }
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
-
-  const handleOrbClick = () => {
-    if (isUltraLightweight) {
-      // In ultra-lightweight mode, show real-time overlay
-      setShowRealTimeOverlay(true);
-    } else {
-      // In normal mode, show chat bar
-      setShowChatBar(true);
-    }
-  };
-
-  const handleRealTimeCommand = async (command: string) => {
-    try {
-      const result = await window.electronAPI?.processRealTimeCommand?.(command);
-      return result || {
-        success: false,
-        intent: 'error',
-        confidence: 0,
-        action: 'error',
-        response: 'Real-time command processing not available',
-        latency: 0
-      };
-    } catch (error) {
-      console.error('❌ Error processing real-time command:', error);
-      return {
-        success: false,
-        intent: 'error',
-        confidence: 0,
-        action: 'error',
-        response: `Error: ${error}`,
-        latency: 0
-      };
-    }
-  };
-
-  const handleToggleVoiceListening = async () => {
-    try {
-      const newState = !isVoiceListening;
-      const result = await window.electronAPI?.toggleVoiceListening?.(newState);
-      if (result?.success) {
-        setIsVoiceListening(newState);
-      }
-    } catch (error) {
-      console.error('❌ Error toggling voice listening:', error);
-    }
-  };
-
-  const handleCloseRealTimeOverlay = () => {
-    setShowRealTimeOverlay(false);
-  };
-
-  console.log('🎨 Rendering App component');
 
   return (
-    <div className="app">
-      <AnimatePresence>
-        {!showChatBar && !showRealTimeOverlay && (
-          <FloatingOrb 
-            key="orb" 
-            isUltraLightweight={isUltraLightweight} 
-            emergencyMode={emergencyMode} 
-            onClick={handleOrbClick}
-          />
-        )}
-        {showChatBar && (
-          <ChatBar key="chatbar" onClose={() => setShowChatBar(false)} />
-        )}
-        {showRealTimeOverlay && (
-          <RealTimeOverlay
-            key="realtime"
-            isVisible={showRealTimeOverlay}
-            onClose={handleCloseRealTimeOverlay}
-            onCommand={handleRealTimeCommand}
-            isListening={isVoiceListening}
-            onToggleListening={handleToggleVoiceListening}
-            isUltraLightweight={isUltraLightweight}
-          />
-        )}
-      </AnimatePresence>
-      
-      {/* Show ultra-lightweight mode indicator */}
-      {isUltraLightweight && (
-        <div className="ultra-lightweight-indicator">
-          ⚡ Ultra-Lightweight Mode
+    <div 
+      className={`app ${state.theme} ${isDragging ? 'dragging' : ''}`}
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`
+      }}
+    >
+      {/* Apple-style header */}
+      <div className="app-header" onMouseDown={handleMouseDown}>
+        <div className="header-controls">
+          <div className="control close"></div>
+          <div className="control minimize"></div>
+          <div className="control maximize"></div>
         </div>
-      )}
-      
-      {/* Show emergency mode indicator */}
-      {emergencyMode && (
-        <div className="emergency-mode-indicator">
-          🚨 Emergency Mode
+        <div className="header-title">
+          <span className="app-icon">🤖</span>
+          <span className="app-name">DELO Assistant</span>
         </div>
-      )}
+        <div className="header-actions">
+          <button 
+            className={`mode-button ${state.currentMode === 'chat' ? 'active' : ''}`}
+            onClick={() => toggleMode('chat')}
+          >
+            💬
+          </button>
+          <button 
+            className={`mode-button ${state.currentMode === 'command' ? 'active' : ''}`}
+            onClick={() => toggleMode('command')}
+          >
+            ⌨️
+          </button>
+          <button 
+            className={`mode-button ${state.currentMode === 'delo' ? 'active' : ''}`}
+            onClick={() => toggleMode('delo')}
+          >
+            🧠
+          </button>
+          <button 
+            className={`mode-button ${state.currentMode === 'realtime' ? 'active' : ''}`}
+            onClick={() => toggleMode('realtime')}
+          >
+            👁️
+          </button>
+          <button className="theme-toggle" onClick={toggleTheme}>
+            {state.theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+          <button className="settings-button" onClick={() => setState(prev => ({ ...prev, showSettings: !prev.showSettings }))}>
+            ⚙️
+          </button>
+        </div>
+      </div>
+
+      {/* Main content area */}
+      <div className="app-content">
+        {state.currentMode === 'chat' && (
+          <div className="chat-container">
+            <div className="messages-container">
+              {state.messages.map((message) => (
+                <div key={message.id} className={`message ${message.type}`}>
+                  <div className="message-content">
+                    <div className="message-text">{message.text}</div>
+                    <div className="message-time">
+                      {message.timestamp.toLocaleTimeString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {state.isProcessing && (
+                <div className="message assistant">
+                  <div className="message-content">
+                    <div className="typing-indicator">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+            <ChatBar />
+          </div>
+        )}
+
+        {state.currentMode === 'command' && (
+          <div className="command-container">
+            <CommandInput />
+          </div>
+        )}
+
+        {state.currentMode === 'delo' && (
+          <div className="delo-container">
+            <DELOInterface />
+          </div>
+        )}
+
+        {state.currentMode === 'realtime' && (
+          <div className="realtime-container">
+            <RealTimeOverlay />
+          </div>
+        )}
+
+        {state.showSettings && (
+          <div className="settings-overlay">
+            <Settings />
+          </div>
+        )}
+      </div>
+
+      {/* Floating orb for quick access */}
+      <FloatingOrb />
     </div>
   );
-}
+};
 
 export default App; 

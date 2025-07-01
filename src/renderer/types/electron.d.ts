@@ -44,6 +44,21 @@ declare global {
       // Listen for emergency mode events
       onEmergencyMode: (callback: (isEmergency: boolean) => void) => void;
       getEmailDraftHistory: (limit?: number) => Promise<{ success: boolean; history?: any[]; error?: string }>;
+
+      // DELOSettings Perception/Context Methods
+      getScreenSnapshots: (limit?: number) => Promise<{ success: boolean; snapshots: any[] }>;
+      getAudioSessions: (limit?: number) => Promise<{ success: boolean; sessions: any[] }>;
+      getContextSnapshots: (limit?: number) => Promise<{ success: boolean; snapshots: any[] }>;
+      startScreenPerception: () => Promise<{ success: boolean; message: string }>;
+      stopScreenPerception: () => Promise<{ success: boolean; message: string }>;
+      startAudioPerception: () => Promise<{ success: boolean; message: string }>;
+      stopAudioPerception: () => Promise<{ success: boolean; message: string }>;
+      startContextManager: () => Promise<{ success: boolean; message: string }>;
+      stopContextManager: () => Promise<{ success: boolean; message: string }>;
+      addScreenFilter: (filter: any) => Promise<{ success: boolean; message: string }>;
+      addAudioFilter: (filter: any) => Promise<{ success: boolean; message: string }>;
+      addContextPattern: (pattern: any) => Promise<{ success: boolean; message: string }>;
+      setQuietHours: (startHour: number, endHour: number) => Promise<{ success: boolean; message: string }>;
     };
   }
 }

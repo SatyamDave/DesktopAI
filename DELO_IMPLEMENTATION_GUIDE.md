@@ -1,464 +1,357 @@
-# DELO - Advanced AI Orb Perception Layer
+# DELO - Intelligent Desktop Automation System
 
-## Overview
+## 🧠 Overview
 
-DELO (Desktop Environment Learning and Observation) is an advanced AI Orb that implements a comprehensive perception layer for seamless desktop copilot functionality. It continuously observes and understands the user's screen and audio environment in real-time, providing intelligent context-aware assistance.
+DELO is an intelligent desktop automation assistant built with Electron + Vite + TypeScript that enables natural language task automation across your desktop. It's not just a UI — it's an intelligent automation layer that understands context and gets things done.
 
-## 🧩 Core Features
+## ✨ Key Features
 
-### 1. Screen Perception (`ScreenPerception.ts`)
-- **Cross-platform screen content reading** using Accessibility APIs
-- **OCR fallback** with Tesseract/Apple Vision/Windows GDI support
-- **Smart diff-based updates** to minimize resource usage
-- **App filtering system** with whitelist/blacklist capabilities
-- **Content hash tracking** for change detection
+### 1. **Clipboard + Screen Context Input**
+- Automatically detects clipboard changes
+- Reads screen text using OCR
+- Understands what you're working on (email, PDF, terminal, etc.)
+- Context-aware suggestions based on current content
 
-**Key Methods:**
-```typescript
-// Start/stop screen monitoring
-await screenPerception.start();
-await screenPerception.stop();
+### 2. **Natural Language Task Parsing**
+- Parses commands like:
+  - "Summarize this"
+  - "Translate to Spanish"
+  - "Send this as an email"
+  - "Create a task from this"
+- Uses AI to classify intent and extract arguments
+- Fallback to keyword matching for reliability
 
-// Get recent snapshots
-const snapshots = await screenPerception.getRecentSnapshots(20);
+### 3. **Command Execution Engine**
+- Routes intent to the right plugin:
+  - `summarize()` - Creates bullet-point summaries
+  - `translate()` - Translates content to any language
+  - `draft_email()` - Composes and opens email drafts
+  - `schedule_event()` - Creates tasks and reminders
+  - `search()` - Opens web searches
+  - `open_app()` - Launches applications
+  - `screenshot()` - Takes screenshots
+  - `system_control()` - Volume, brightness, lock, etc.
 
-// Add app filters
-await screenPerception.addAppFilter({
-  app_name: 'Chrome',
-  is_whitelisted: true,
-  is_blacklisted: false,
-  window_patterns: ['Gmail', 'Google Docs']
-});
+### 4. **Cross-App Automation**
+- Detects current app/context
+- Opens applications via shell or browser
+- Auto-fills content using prior text
+- Awaits user approval before sending
+
+### 5. **Session Memory + Non-Redundancy**
+- Stores short-term memory of actions
+- Prevents duplicate task execution
+- Content hash tracking for efficiency
+- Pattern recognition for workflow optimization
+
+### 6. **Proactive Suggestions**
+- Detects repeat patterns (e.g., summarize + email after meetings)
+- Offers smart nudges like: "You just copied meeting notes. Want to send a recap?"
+- Context-aware quick actions
+- Productivity insights and recommendations
+
+## 🚀 Quick Start
+
+### Installation
+
+1. **Clone the repository**
+```bash
+git clone <repository-url>
+cd AgentMarket
 ```
 
-### 2. Audio Perception (`AudioPerception.ts`)
-- **Continuous audio monitoring** of system audio and microphone
-- **Whisper integration** for real-time speech transcription
-- **Smart silence detection** and session management
-- **Audio source filtering** with volume thresholds
-- **Transcript search** and history management
-
-**Key Methods:**
-```typescript
-// Start/stop audio monitoring
-await audioPerception.start();
-await audioPerception.stop();
-
-// Get audio sessions
-const sessions = await audioPerception.getRecentSessions(20);
-
-// Search transcripts
-const results = await audioPerception.searchTranscripts('meeting notes');
-
-// Add audio filters
-await audioPerception.addAudioFilter({
-  source_name: 'Spotify',
-  is_blacklisted: true,
-  volume_threshold: 0.1,
-  keywords: ['music', 'song']
-});
+2. **Install dependencies**
+```bash
+npm install
 ```
 
-### 3. Context Manager (`ContextManager.ts`)
-- **Intelligent context analysis** combining screen and audio data
-- **User intent detection** using AI models
-- **Pattern-based automation** triggers
-- **Quiet hours** and privacy controls
-- **Context snapshots** with vector embeddings
-
-**Key Methods:**
-```typescript
-// Start/stop context management
-await contextManager.start();
-await contextManager.stop();
-
-// Get context snapshots
-const snapshots = await contextManager.getRecentContext(20);
-
-// Add context patterns
-await contextManager.addContextPattern({
-  pattern_name: 'Coding Session',
-  app_name: 'VSCode',
-  window_pattern: '.js',
-  audio_keywords: ['debug', 'error'],
-  screen_keywords: ['function', 'class'],
-  trigger_actions: ['suggest_fix', 'open_documentation']
-});
-
-// Set quiet hours
-contextManager.setQuietHours(22, 6); // 10 PM to 6 AM
+3. **Set up environment variables**
+```bash
+cp env.example .env
+# Edit .env with your API keys
 ```
 
-## 🚀 Getting Started
+4. **Start the application**
+```bash
+npm run dev
+```
 
-### 1. Environment Configuration
+### Basic Usage
 
-Update your `.env` file with DELO-specific settings:
+1. **Launch DELO**
+   - Click the floating orb to open the DELO interface
+   - Or use the global hotkey (Ctrl+Shift+D)
+
+2. **Natural Language Commands**
+   ```
+   "summarize this"           # Summarize clipboard content
+   "translate to Spanish"     # Translate clipboard content
+   "send as email to team"    # Create email draft
+   "create task from this"    # Create task from content
+   "search for AI news"       # Web search
+   "open Gmail"              # Launch application
+   "take screenshot"         # Capture screen
+   "volume up"               # System control
+   ```
+
+3. **Context-Aware Workflows**
+   ```
+   Copy meeting notes → "summarize this and email to Sarah"
+   Copy article → "translate to French"
+   Copy task list → "create tasks from this"
+   ```
+
+## 🏗️ Architecture
+
+### Core Components
+
+#### 1. **DELOCommandSystem** (`src/main/services/DELOCommandSystem.ts`)
+- Main orchestrator for all automation features
+- Manages command registration and execution
+- Handles session memory and pattern recognition
+- Provides context-aware suggestions
+
+#### 2. **Command Interface**
+```typescript
+interface DeloCommand {
+  name: string;
+  description: string;
+  match(input: string, context: DeloContext): boolean;
+  execute(context: DeloContext, args?: any): Promise<DeloCommandResult>;
+  getSuggestions?(context: DeloContext): string[];
+}
+```
+
+#### 3. **Context Management**
+```typescript
+interface DeloContext {
+  clipboardContent: string;
+  activeApp: string;
+  windowTitle: string;
+  screenText?: string;
+  recentCommands: string[];
+  sessionDuration: number;
+  userIntent?: string;
+  extractedArgs?: any;
+}
+```
+
+### Service Integration
+
+- **ClipboardManager**: Monitors clipboard changes
+- **ScreenOCRService**: Extracts text from screen
+- **ActiveWindowService**: Tracks active application
+- **LocalLLMService**: Natural language processing
+- **EmailService**: Email composition and sending
+- **AppLaunchService**: Application launching
+- **SessionMemoryManager**: Session tracking and insights
+
+## 📝 Command Examples
+
+### Text Processing
+```bash
+"summarize this document"     # Creates bullet-point summary
+"translate to French"         # Translates clipboard content
+"extract key points"          # Extracts main ideas
+"format as bullet points"     # Reformats text
+```
+
+### Communication
+```bash
+"send as email to john@example.com"    # Creates email draft
+"email this to the team"               # Team email with content
+"compose reply to this"                # Reply to current email
+"schedule meeting about this"          # Creates calendar event
+```
+
+### Task Management
+```bash
+"create task from this"       # Creates task from content
+"add to todo list"           # Adds to task list
+"set reminder for tomorrow"  # Creates reminder
+"schedule follow-up"         # Schedules follow-up task
+```
+
+### System Control
+```bash
+"open Gmail"                 # Launches Gmail
+"take screenshot"           # Captures screen
+"volume up"                 # Increases volume
+"lock computer"             # Locks system
+"brightness down"           # Decreases brightness
+```
+
+### Web & Search
+```bash
+"search for this"           # Web search
+"look up definition"        # Dictionary search
+"find similar articles"     # Related content search
+"open in browser"           # Opens URL in browser
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+```bash
+# AI Services
+GEMINI_API_KEY=your_gemini_key
+AZURE_OPENAI_API_KEY=your_azure_key
+AZURE_OPENAI_ENDPOINT=your_endpoint
+
+# Performance
+DEBUG_MODE=true
+ULTRA_LIGHTWEIGHT=false
+DISABLE_CLIPBOARD_TRACKING=false
+DISABLE_BEHAVIOR_TRACKING=false
+
+# Features
+ENABLE_DELO_AUTOMATION=true
+ENABLE_SCREEN_OCR=true
+ENABLE_VOICE_COMMANDS=true
+```
+
+### Custom Commands
+
+Add custom commands by implementing the `DeloCommand` interface:
+
+```typescript
+class CustomCommand implements DeloCommand {
+  name = 'custom';
+  description = 'Custom automation command';
+
+  match(input: string, context: DeloContext): boolean {
+    return input.toLowerCase().includes('custom');
+  }
+
+  async execute(context: DeloContext, args?: any): Promise<DeloCommandResult> {
+    // Your custom logic here
+    return {
+      success: true,
+      message: 'Custom command executed',
+      action: 'custom_executed'
+    };
+  }
+}
+
+// Register the command
+deloCommandSystem.registerCommand(new CustomCommand());
+```
+
+## 🧪 Testing
+
+Run the comprehensive test suite:
 
 ```bash
-# DELO Perception Layer Configuration
-DISABLE_SCREEN_PERCEPTION=false
-DISABLE_AUDIO_PERCEPTION=false
-DISABLE_CONTEXT_MANAGER=false
-
-# Performance Configuration
-PERFORMANCE_MONITORING_INTERVAL=60000
-ULTRA_LIGHTWEIGHT=false
+node test-delo-system.js
 ```
 
-### 2. Starting DELO Services
+The test suite covers:
+- Basic command processing
+- Clipboard context detection
+- Natural language parsing
+- Command execution
+- Session memory
+- Proactive suggestions
+- Cross-app automation
+- Error handling
+- Performance
+- Integration workflows
 
-The DELO perception layer is automatically initialized when the app starts. Services are loaded on-demand for optimal performance:
+## 📊 Session Insights
 
-```typescript
-// Services are automatically initialized when needed
-// You can manually start them if desired:
+DELO provides productivity insights:
 
-// Start all perception services
-await contextManager.start(); // This starts screen and audio perception too
+- **Productivity Score**: Based on successful command execution
+- **User Habits**: Pattern recognition for common workflows
+- **Recent Tasks**: History of recent automation actions
+- **Suggestions**: AI-powered recommendations for efficiency
 
-// Or start individually
-await screenPerception.start();
-await audioPerception.start();
-```
+## 🔄 Example Workflows
 
-### 3. User Interface
+### Meeting Follow-up Workflow
+1. Copy meeting notes to clipboard
+2. Say: "summarize this and email to team"
+3. DELO creates summary and opens email client
+4. Review and send
 
-#### Floating Orb Indicators
-The DELO orb provides visual feedback about perception layer status:
+### Content Translation Workflow
+1. Copy foreign language text
+2. Say: "translate to English"
+3. DELO translates and copies to clipboard
+4. Paste translated content
 
-- **Green orb**: Perception layer active
-- **Orange orb**: Whisper mode active
-- **Blue orb**: Default state
-- **Pulsing animation**: Active perception
-- **Status dots**: Individual service indicators
+### Task Creation Workflow
+1. Copy task list or action items
+2. Say: "create tasks from this"
+3. DELO parses content and creates structured tasks
+4. Tasks saved to file and copied to clipboard
 
-#### Context Menu
-Right-click the orb to access:
-- DELO Settings panel
-- Service status indicators
-- Quick controls
+### Research Workflow
+1. Copy research topic
+2. Say: "search for this and summarize"
+3. DELO opens search and creates summary
+4. Results ready for use
 
-#### Settings Panel
-Access comprehensive DELO configuration through the settings panel:
-- **Overview**: Service status and recent activity
-- **Screen Perception**: App filters and monitoring controls
-- **Audio Perception**: Audio filters and transcription settings
-- **Context Manager**: Pattern management and quiet hours
-- **Patterns & Filters**: Advanced automation rules
-
-## 🎯 Advanced Features
-
-### 1. Smart Filtering
-
-#### App Filtering
-```typescript
-// Blacklist sensitive applications
-await screenPerception.addAppFilter({
-  app_name: 'Chrome',
-  is_blacklisted: true,
-  window_patterns: ['incognito', 'private']
-});
-
-// Whitelist specific applications
-await screenPerception.addAppFilter({
-  app_name: 'VSCode',
-  is_whitelisted: true,
-  window_patterns: ['.js', '.ts', '.py']
-});
-```
-
-#### Audio Filtering
-```typescript
-// Filter out music applications
-await audioPerception.addAudioFilter({
-  source_name: 'Spotify',
-  is_blacklisted: true,
-  volume_threshold: 0.1,
-  keywords: ['music', 'song', 'playlist']
-});
-
-// Monitor specific audio sources
-await audioPerception.addAudioFilter({
-  source_name: 'Zoom',
-  is_whitelisted: true,
-  volume_threshold: 0.3,
-  keywords: ['meeting', 'call', 'presentation']
-});
-```
-
-### 2. Context Patterns
-
-Define intelligent automation patterns:
-
-```typescript
-// Email composition pattern
-await contextManager.addContextPattern({
-  pattern_name: 'Email Composition',
-  app_name: 'Gmail',
-  window_pattern: 'compose',
-  audio_keywords: ['email', 'send', 'draft'],
-  screen_keywords: ['subject', 'recipient', 'message'],
-  trigger_actions: ['suggest_subject', 'check_grammar', 'find_attachments']
-});
-
-// Coding session pattern
-await contextManager.addContextPattern({
-  pattern_name: 'Coding Session',
-  app_name: 'VSCode',
-  window_pattern: '.js',
-  audio_keywords: ['debug', 'error', 'function'],
-  screen_keywords: ['console.log', 'function', 'class'],
-  trigger_actions: ['suggest_fix', 'open_documentation', 'run_tests']
-});
-```
-
-### 3. Privacy Controls
-
-#### Quiet Hours
-```typescript
-// Set quiet hours (10 PM to 6 AM)
-contextManager.setQuietHours(22, 6);
-
-// During quiet hours, perception is paused
-// Users can still manually activate services
-```
-
-#### Emergency Stop
-```typescript
-// Stop all perception immediately
-await screenPerception.stop();
-await audioPerception.stop();
-await contextManager.stop();
-
-// Or use the emergency shutdown
-await emergencyShutdown();
-```
-
-## 🔧 Technical Architecture
-
-### Service Dependencies
-```
-ContextManager
-├── ScreenPerception
-├── AudioPerception
-├── AIProcessor
-└── DatabaseManager
-```
-
-### Database Schema
-
-#### Screen Snapshots
-```sql
-CREATE TABLE screen_snapshots (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  timestamp INTEGER NOT NULL,
-  app_name TEXT NOT NULL,
-  window_title TEXT NOT NULL,
-  content_text TEXT,
-  content_hash TEXT NOT NULL,
-  ocr_confidence REAL DEFAULT 0.0,
-  accessibility_available INTEGER DEFAULT 0,
-  metadata TEXT
-);
-```
-
-#### Audio Sessions
-```sql
-CREATE TABLE audio_sessions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  start_time INTEGER NOT NULL,
-  end_time INTEGER,
-  duration INTEGER,
-  transcript TEXT,
-  confidence REAL DEFAULT 0.0,
-  audio_source TEXT NOT NULL,
-  is_system_audio INTEGER DEFAULT 0,
-  is_microphone INTEGER DEFAULT 0,
-  metadata TEXT
-);
-```
-
-#### Context Snapshots
-```sql
-CREATE TABLE context_snapshots (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  timestamp INTEGER NOT NULL,
-  screen_snapshot_id INTEGER,
-  audio_session_id INTEGER,
-  app_name TEXT NOT NULL,
-  window_title TEXT NOT NULL,
-  screen_content TEXT,
-  audio_transcript TEXT,
-  user_intent TEXT,
-  confidence REAL DEFAULT 0.0,
-  metadata TEXT
-);
-```
-
-### Performance Optimization
-
-#### Throttling
-- **Screen perception**: 30-120 second intervals
-- **Audio perception**: 1-5 second intervals
-- **Context analysis**: 15-60 second intervals
-
-#### Resource Management
-- **Lazy initialization**: Services start on-demand
-- **Memory optimization**: Automatic cleanup of old data
-- **CPU throttling**: Adaptive intervals based on system load
-
-#### Emergency Mode
-- **Automatic activation** when system resources are low
-- **Service suspension** to prevent system overload
-- **Gradual restart** when conditions improve
-
-## 🎨 User Experience
-
-### Visual Feedback
-- **Orb color changes** based on active services
-- **Pulsing animation** during active perception
-- **Status indicators** for individual services
-- **Context menu** for quick access to controls
-
-### Privacy Transparency
-- **Clear indicators** when services are active
-- **Easy controls** to stop/start services
-- **Quiet hours** for automatic privacy
-- **Emergency stop** for immediate privacy
-
-### Onboarding
-- **Simple toggles** for service activation
-- **Filter configuration** for privacy control
-- **Pattern creation** for automation
-- **Performance monitoring** for optimization
-
-## 🔒 Privacy & Security
-
-### Data Storage
-- **Local storage only**: All data stays on your device
-- **Encrypted databases**: Sensitive data is encrypted
-- **Automatic cleanup**: Old data is automatically removed
-- **User control**: Full control over data retention
-
-### Privacy Controls
-- **App filtering**: Choose which apps to monitor
-- **Audio filtering**: Control audio source monitoring
-- **Quiet hours**: Automatic privacy during specified times
-- **Emergency stop**: Immediate privacy activation
-
-### Transparency
-- **Clear indicators**: Always know when services are active
-- **Data access**: View and export your data
-- **Service control**: Start/stop services at any time
-- **Configuration**: Full control over all settings
-
-## 🚀 Future Enhancements
-
-### Planned Features
-- **Vector embeddings** for semantic search
-- **Advanced AI models** for better intent detection
-- **Cross-device sync** for multi-device context
-- **API integration** for third-party services
-- **Advanced automation** with custom workflows
-
-### Performance Improvements
-- **GPU acceleration** for OCR and AI processing
-- **Streaming processing** for real-time analysis
-- **Distributed processing** for heavy workloads
-- **Caching optimization** for faster responses
-
-## 📚 API Reference
-
-### IPC Methods
-
-#### Screen Perception
-```typescript
-// Start/stop screen perception
-ipcMain.handle('start-screen-perception', async () => {});
-ipcMain.handle('stop-screen-perception', async () => {});
-
-// Get snapshots and add filters
-ipcMain.handle('get-screen-snapshots', async (event, limit) => {});
-ipcMain.handle('add-screen-filter', async (event, filter) => {});
-```
-
-#### Audio Perception
-```typescript
-// Start/stop audio perception
-ipcMain.handle('start-audio-perception', async () => {});
-ipcMain.handle('stop-audio-perception', async () => {});
-
-// Get sessions and search transcripts
-ipcMain.handle('get-audio-sessions', async (event, limit) => {});
-ipcMain.handle('search-audio-transcripts', async (event, query) => {});
-```
-
-#### Context Manager
-```typescript
-// Start/stop context manager
-ipcMain.handle('start-context-manager', async () => {});
-ipcMain.handle('stop-context-manager', async () => {});
-
-// Get snapshots and add patterns
-ipcMain.handle('get-context-snapshots', async (event, limit) => {});
-ipcMain.handle('add-context-pattern', async (event, pattern) => {});
-```
-
-## 🐛 Troubleshooting
+## 🚨 Troubleshooting
 
 ### Common Issues
 
-#### Services Not Starting
-```bash
-# Check environment variables
-echo $DISABLE_SCREEN_PERCEPTION
-echo $DISABLE_AUDIO_PERCEPTION
-echo $DISABLE_CONTEXT_MANAGER
+1. **Commands not recognized**
+   - Check if LocalLLMService is initialized
+   - Verify API keys are set correctly
+   - Try more specific commands
 
-# Check logs for errors
-tail -f ~/.doppel/logs/app.log
-```
+2. **Clipboard not detected**
+   - Ensure clipboard permissions are granted
+   - Check if ClipboardManager is running
+   - Restart the application
 
-#### Performance Issues
-```bash
-# Enable ultra-lightweight mode
-export ULTRA_LIGHTWEIGHT=true
+3. **Performance issues**
+   - Enable ultra-lightweight mode
+   - Disable unnecessary services
+   - Check system resources
 
-# Disable specific services
-export DISABLE_SCREEN_PERCEPTION=true
-export DISABLE_AUDIO_PERCEPTION=true
-```
-
-#### Privacy Concerns
-```typescript
-// Stop all services immediately
-await contextManager.stop();
-
-// Set quiet hours
-contextManager.setQuietHours(0, 24); // Always quiet
-
-// Clear all data
-await databaseManager.clearAllData();
-```
+4. **Email composition fails**
+   - Verify EmailService configuration
+   - Check default email client
+   - Ensure internet connection
 
 ### Debug Mode
-```bash
-# Enable debug logging
-export DEBUG_MODE=true
 
-# Check service status
-curl http://localhost:3000/api/status
+Enable debug mode for detailed logging:
+
+```bash
+DEBUG_MODE=true npm run dev
 ```
+
+## 🔮 Future Enhancements
+
+- **Voice Commands**: Speech-to-text integration
+- **Advanced OCR**: Better text extraction from images
+- **Workflow Templates**: Pre-defined automation sequences
+- **Plugin System**: Third-party command extensions
+- **Cloud Sync**: Cross-device synchronization
+- **Advanced AI**: More sophisticated intent recognition
 
 ## 📄 License
 
-This implementation is part of the Doppel AI Assistant project and is licensed under the MIT License.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🤝 Contributing
 
-Contributions to the DELO perception layer are welcome! Please see the main project README for contribution guidelines.
+1. Fork the repository
+2. Create a feature branch
+3. Implement your changes
+4. Add tests for new functionality
+5. Submit a pull request
+
+## 📞 Support
+
+For support and questions:
+- Create an issue on GitHub
+- Check the troubleshooting section
+- Review the test suite for examples
 
 ---
 
-**DELO** - Your intelligent desktop copilot that sees, hears, and understands your digital environment. 
+**DELO** - Making desktop automation as natural as conversation. 🧠✨ 

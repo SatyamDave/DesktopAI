@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DELO Orb</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        .orb-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        .orb {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed, #6d28d9);
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 32px 0 rgba(139, 92, 246, 0.3);
+            cursor: grab;
+            pointer-events: auto;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        .orb:active {
+            cursor: grabbing;
+        }
+        
+        .orb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 8px 48px 0 rgba(139, 92, 246, 0.5);
+            filter: brightness(1.3);
+        }
+        
+        .orb:active {
+            transform: scale(0.9);
+        }
+        
+        .glow {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed, #6d28d9);
+            filter: blur(20px);
+            opacity: 0.3;
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        .command-interface {
+            position: absolute;
+            bottom: 120px;
+            right: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 300px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            display: none;
+            pointer-events: auto;
+        }
+        
+        .command-interface.show {
+            display: block;
+        }
+        
+        .command-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .command-button {
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+        
+        .command-button:hover {
+            background: #7c3aed;
+        }
+        
+        .status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="status">DELO Orb Active - Press Ctrl+H to toggle</div>
+    
+    <div class="orb-container">
+        <div class="glow"></div>
+        <div class="orb" onclick="toggleCommandInterface()">
+            🤖
+        </div>
+        
+        <div class="command-interface" id="commandInterface">
+            <h3 style="margin: 0 0 15px 0; color: #333;">DELO Assistant</h3>
+            <input type="text" class="command-input" id="commandInput" placeholder="What would you like me to do?" onkeydown="handleKeyDown(event)">
+            <div style="margin-top: 10px;">
+                <button class="command-button" onclick="executeCommand()">Send to Gemini</button>
+                <button class="command-button" onclick="toggleCommandInterface()" style="background: #6b7280;">Cancel</button>
+            </div>
+            <div id="result" style="margin-top: 10px; padding: 10px; background: #f3f4f6; border-radius: 6px; display: none;"></div>
+            <div id="confirmation" style="margin-top: 10px; padding: 10px; background: #fef3c7; border-radius: 6px; display: none;">
+                <div style="margin-bottom: 10px;">
+                    <strong>🤖 Here's what I understood from your prompt:</strong>
+                </div>
+                <div id="clarification-content" style="margin-bottom: 10px;"></div>
+                <div style="margin-top: 10px;">
+                    <input type="text" id="confirmationInput" placeholder="Type 'yes' to proceed or 'no' to modify" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px;">
+                    <button class="command-button" onclick="confirmExecution()" style="background: #059669;">Confirm & Execute</button>
+                    <button class="command-button" onclick="modifyPrompt()" style="background: #dc2626;">Modify Prompt</button>
+                </div>
+            </div>
+            <div style="margin-top: 10px; font-size: 12px; color: #6b7280;">
+                <div>🧠 DELO AI Examples:</div>
+                <div>• "summarize this" → summarizes clipboard content</div>
+                <div>• "email this to team" → drafts email with content</div>
+                <div>• "search amazon for sd cards" → opens Amazon search</div>
+                <div>• "fix this spelling" → corrects clipboard text</div>
+                <div>• "what time is it" → shows current time</div>
+                <div>Press Enter to send to Gemini, Esc to close</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+        
+        const orb = document.querySelector('.orb');
+        const glow = document.querySelector('.glow');
+        const commandInterface = document.getElementById('commandInterface');
+        const commandInput = document.getElementById('commandInput');
+        const result = document.getElementById('result');
+        const confirmation = document.getElementById('confirmation');
+        const confirmationInput = document.getElementById('confirmationInput');
+        const clarificationContent = document.getElementById('clarification-content');
+        
+        // Store current command state
+        let currentCommandState = null;
+        
+        // Make orb draggable
+        orb.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', stopDrag);
+        
+        function startDrag(e) {
+            if (e.target === orb) {
+                isDragging = true;
+                const rect = orb.getBoundingClientRect();
+                dragOffset.x = e.clientX - rect.left;
+                dragOffset.y = e.clientY - rect.top;
+                e.preventDefault();
+            }
+        }
+        
+        function drag(e) {
+            if (isDragging) {
+                const x = Math.max(0, Math.min(window.innerWidth - 80, e.clientX - dragOffset.x));
+                const y = Math.max(0, Math.min(window.innerHeight - 80, e.clientY - dragOffset.y));
+                
+                orb.style.left = x + 'px';
+                orb.style.top = y + 'px';
+                orb.style.right = 'auto';
+                orb.style.bottom = 'auto';
+                
+                glow.style.left = x + 'px';
+                glow.style.top = y + 'px';
+                glow.style.right = 'auto';
+                glow.style.bottom = 'auto';
+            }
+        }
+        
+        function stopDrag() {
+            isDragging = false;
+        }
+        
+        function toggleCommandInterface() {
+            const isVisible = commandInterface.classList.contains('show');
+            if (isVisible) {
+                commandInterface.classList.remove('show');
+                result.style.display = 'none';
+            } else {
+                commandInterface.classList.add('show');
+                commandInput.focus();
+            }
+        }
+        
+        function handleKeyDown(e) {
+            if (e.key === 'Enter') {
+                if (confirmation.style.display === 'block') {
+                    confirmExecution();
+                } else {
+                    executeCommand();
+                }
+            } else if (e.key === 'Escape') {
+                if (confirmation.style.display === 'block') {
+                    modifyPrompt();
+                } else {
+                    toggleCommandInterface();
+                }
+            }
+        }
+        
+        async function executeCommand() {
+            const command = commandInput.value.trim();
+            if (!command) return;
+            
+            result.style.display = 'block';
+            result.innerHTML = '<div style="color: #8b5cf6;">🤖 Sending to Gemini for clarification...</div>';
+            confirmation.style.display = 'none';
+            
+            try {
+                if (window.electronAPI) {
+                    console.log('Sending command to Gemini via electronAPI:', command);
+                    const response = await window.electronAPI.executeCommand(command);
+                    console.log('Gemini response:', response);
+                    
+                    if (response && response.success && response.needsConfirmation) {
+                        // Store command state for confirmation
+                        currentCommandState = {
+                            command: command,
+                            clarification: response.clarification,
+                            clipboardContent: response.clipboardContent
+                        };
+                        
+                        // Show clarification for user confirmation
+                        showClarification(response.clarification, command);
+                    } else if (response && response.success) {
+                        result.innerHTML = `<div style="color: #059669;"><strong>✅ Success:</strong> ${response.result || 'Command executed successfully'}</div>`;
+                    } else {
+                        result.innerHTML = `<div style="color: #dc2626;"><strong>❌ Error:</strong> ${response.error || 'Command failed'}</div>`;
+                    }
+                } else {
+                    console.log('electronAPI not available, using fallback');
+                    result.innerHTML = `<div style="color: #059669;"><strong>✅ Result:</strong> Command sent to Gemini: ${command}</div>`;
+                }
+            } catch (error) {
+                console.error('Command execution error:', error);
+                result.innerHTML = `<div style="color: #dc2626;"><strong>❌ Error:</strong> ${error.message || 'Unknown error occurred'}</div>`;
+            }
+            
+            commandInput.value = '';
+        }
+        
+        function showClarification(clarification, originalCommand) {
+            result.style.display = 'none';
+            confirmation.style.display = 'block';
+            
+            let clarificationHtml = `
+                <div style="margin-bottom: 8px;"><strong>Original:</strong> "${originalCommand}"</div>
+                <div style="margin-bottom: 8px;"><strong>Clarified Intent:</strong> ${clarification.clarifiedIntent}</div>
+                <div style="margin-bottom: 8px;"><strong>Action Steps:</strong></div>
+                <ol style="margin: 0; padding-left: 20px;">
+            `;
+            
+            clarification.actionSteps.forEach((step, index) => {
+                clarificationHtml += `<li style="margin-bottom: 4px;">${step}</li>`;
+            });
+            
+            clarificationHtml += `</ol>`;
+            
+            if (clarification.context) {
+                clarificationHtml += `<div style="margin-top: 8px; font-size: 11px; color: #6b7280;"><strong>Context:</strong> ${clarification.context}</div>`;
+            }
+            
+            clarificationContent.innerHTML = clarificationHtml;
+            confirmationInput.focus();
+        }
+        
+        async function confirmExecution() {
+            const userResponse = confirmationInput.value.trim().toLowerCase();
+            
+            if (!currentCommandState) {
+                result.style.display = 'block';
+                result.innerHTML = `<div style="color: #dc2626;"><strong>❌ Error:</strong> No command to confirm</div>`;
+                confirmation.style.display = 'none';
+                return;
+            }
+            
+            try {
+                const response = await window.electronAPI.confirmAndExecute(
+                    userResponse,
+                    currentCommandState.clarification,
+                    currentCommandState.command,
+                    currentCommandState.clipboardContent
+                );
+                
+                if (response && response.success && response.executed) {
+                    let resultHtml = `<div style="color: #059669;"><strong>✅ Executed Successfully!</strong></div>`;
+                    
+                    response.results.forEach((resultItem, index) => {
+                        resultHtml += `
+                            <div style="margin-top: 8px; padding: 8px; background: #f0f9ff; border-radius: 4px;">
+                                <strong>Step ${index + 1}:</strong> ${resultItem.step}<br>
+                                <strong>Result:</strong> ${resultItem.result}<br>
+                                <strong>Action:</strong> ${resultItem.actionType}
+                            </div>
+                        `;
+                    });
+                    
+                    result.innerHTML = resultHtml;
+                } else if (response && response.success && !response.executed) {
+                    result.innerHTML = `<div style="color: #f59e0b;"><strong>⚠️ Cancelled:</strong> ${response.message}</div>`;
+                } else {
+                    result.innerHTML = `<div style="color: #dc2626;"><strong>❌ Error:</strong> ${response.error || 'Execution failed'}</div>`;
+                }
+                
+                confirmation.style.display = 'none';
+                result.style.display = 'block';
+                currentCommandState = null;
+                
+            } catch (error) {
+                console.error('Confirmation error:', error);
+                result.style.display = 'block';
+                result.innerHTML = `<div style="color: #dc2626;"><strong>❌ Error:</strong> ${error.message || 'Confirmation failed'}</div>`;
+                confirmation.style.display = 'none';
+            }
+        }
+        
+        function modifyPrompt() {
+            confirmation.style.display = 'none';
+            result.style.display = 'none';
+            commandInput.focus();
+            currentCommandState = null;
+        }
+        
+        // Add keyboard listener for confirmation input
+        confirmationInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                confirmExecution();
+            } else if (e.key === 'Escape') {
+                modifyPrompt();
+            }
+        });
+        
+        // Listen for global shortcuts via IPC
+        if (window.electronAPI) {
+            window.electronAPI.getAppStatus().then(status => {
+                console.log('App status:', status);
+            });
+        }
+        
+        console.log('DELO Orb fallback loaded successfully!');
+    </script>
+</body>
+</html> 

@@ -75,6 +75,12 @@ export class DatabaseManager {
   }
 
   public registerDatabase(config: DatabaseConfig): void {
+    // Prevent duplicate registrations
+    if (this.configs.has(config.name)) {
+      console.log(`📊 Database already registered: ${config.name}`);
+      return;
+    }
+    
     this.configs.set(config.name, config);
     
     // Create database directory if it doesn't exist
@@ -125,6 +131,9 @@ export class DatabaseManager {
     const config = this.configs.get(name)!;
     
     try {
+      // Initialize database tables if they don't exist
+      await this.initializeDatabase(name);
+      
       const startTime = performance.now();
       const result = db.exec(sql, params);
       const endTime = performance.now();
@@ -300,6 +309,71 @@ export class DatabaseManager {
     // Save all databases
     for (const name of this.databases.keys()) {
       await this.saveDatabase(name);
+    }
+  }
+
+  async initializeDatabase(dbName: string): Promise<void> {
+    const db = await this.getDatabase(dbName);
+    
+    // Create tables based on database name
+    switch (dbName) {
+      case 'screen_perception':
+        await this.executeQuery(dbName, `
+          CREATE TABLE IF NOT EXISTS app_filters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            app_name TEXT NOT NULL,
+            filter_type TEXT NOT NULL,
+            filter_value TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        break;
+        
+      case 'audio_perception':
+        await this.executeQuery(dbName, `
+          CREATE TABLE IF NOT EXISTS audio_filters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filter_name TEXT NOT NULL,
+            filter_type TEXT NOT NULL,
+            filter_value TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        break;
+        
+      case 'context_manager':
+        await this.executeQuery(dbName, `
+          CREATE TABLE IF NOT EXISTS context_patterns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pattern_name TEXT NOT NULL,
+            pattern_type TEXT NOT NULL,
+            pattern_data TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        break;
+        
+      case 'behavior':
+        await this.executeQuery(dbName, `
+          CREATE TABLE IF NOT EXISTS user_actions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            action_type TEXT NOT NULL,
+            action_data TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        break;
+        
+      case 'load_user_actions':
+        await this.executeQuery(dbName, `
+          CREATE TABLE IF NOT EXISTS user_actions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            action_type TEXT NOT NULL,
+            action_data TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        break;
     }
   }
 } 

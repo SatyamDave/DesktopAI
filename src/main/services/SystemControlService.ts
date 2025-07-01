@@ -78,25 +78,31 @@ interface ScreenCapture {
 export class SystemControlService {
   private isInitialized = false;
   private tesseractWorker: any = null;
-  private screenBounds: { width: number; height: number } = { width: 0, height: 0 };
+  private screenBounds: Electron.Rectangle = { x: 0, y: 0, width: 1920, height: 1080 };
   private lastScreenshot: ScreenCapture | null = null;
   private screenshotCache: Map<string, ScreenCapture> = new Map();
   private maxCacheSize = 10;
+  private screen!: Electron.Screen;
+  private primaryDisplay!: Electron.Display;
+  private displays!: Electron.Display[];
 
   constructor() {
-    this.initialize();
+    // Don't initialize screen here - wait for app ready
+    console.log('🖥️ Initializing System Control Service...');
   }
 
-  public async initialize(): Promise<void> {
+  async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
-      console.log('🖥️ Initializing System Control Service...');
+      // Initialize screen after app is ready
+      this.screen = require('electron').screen;
+      this.primaryDisplay = this.screen.getPrimaryDisplay();
+      this.displays = this.screen.getAllDisplays();
       
       // Get screen bounds
-      const displays = screen.getAllDisplays();
-      if (displays.length > 0) {
-        this.screenBounds = displays[0].bounds;
+      if (this.displays.length > 0) {
+        this.screenBounds = this.displays[0].bounds;
       }
 
       // Initialize Tesseract OCR
@@ -474,7 +480,7 @@ export class SystemControlService {
     }
   }
 
-  public async getScreenBounds(): Promise<{ width: number; height: number }> {
+  public async getScreenBounds(): Promise<Electron.Rectangle> {
     await this.initialize();
     return this.screenBounds;
   }
