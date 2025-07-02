@@ -63,7 +63,6 @@
     "node-wit": "^6.5.0",
     "openai": "^5.8.2",
     "ora": "^7.0.1",
-    "fast-json-schema": "^2.0.0",
     "postcss": "^8.4.32",
     "ps-list": "^8.0.0",
     "react": "^18.2.0",

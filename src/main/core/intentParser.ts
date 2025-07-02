@@ -1,7 +1,8 @@
 import fetch from 'node-fetch';
+import { OpenAI } from 'openai';
 import { registry } from './registry';
 import { Context, contextManager } from './context';
-import { videoSearchService } from '../services/VideoSearchService';
+require('dotenv').config();
 
 export interface IntentResult {
   functionName: string;
@@ -9,6 +10,11 @@ export interface IntentResult {
   confidence: number;
   reasoning?: string;
 }
+
+const openai = new OpenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
+});
 
 export class IntentParser {
   private debug: boolean;
@@ -18,82 +24,133 @@ export class IntentParser {
   }
 
   public async parseIntent(userText: string, context: Context): Promise<IntentResult> {
+    // 1. Try OpenRouter
     try {
-      this.log(`Parsing intent for: "${userText}"`);
-
-      // Get available functions from registry
-      const availableFunctions = registry.getManifests();
-      if (availableFunctions.length === 0) {
-        throw new Error('No plugins available for function calling');
-      }
-
-      // Gemini expects tools as [{ functionDeclarations: [...] }]
-      const tools = [
-        {
-          functionDeclarations: availableFunctions.map(func => ({
-            name: func.name,
-            description: func.description,
-            parameters: func.parameters
-          }))
-        }
-      ];
-
-      const systemPrompt = this.buildSystemPrompt(context);
-      const geminiApiKey = process.env.GEMINI_API_KEY;
-      if (!geminiApiKey) throw new Error('Gemini API key not set.');
-      const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + geminiApiKey;
-      const body = {
-        contents: [
-          { role: 'model', parts: [{ text: systemPrompt }] },
-          { role: 'user', parts: [{ text: userText }] }
-        ],
-        tools: tools,
-        toolConfig: { mode: 'AUTO' }
-      };
-      this.log('Sending to Gemini:', JSON.stringify(body, null, 2));
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const data = await res.json();
-      this.log('Gemini response:', data);
-
-      // Try to extract function call from Gemini response
-      if (data.candidates && data.candidates[0]) {
-        const candidate = data.candidates[0];
-        if (candidate.content && candidate.content.parts) {
-          // Look for a function call in the parts
-          for (const part of candidate.content.parts) {
-            if (part.functionCall) {
-              const { name, args } = part.functionCall;
-              this.log(`Intent parsed: ${name} with args:`, args);
-              return {
-                functionName: name,
-                arguments: args || {},
-                confidence: 0.9,
-                reasoning: `Gemini selected function: ${name}`
-              };
-            }
-          }
-        }
-        // If no function call, treat as conversation
-        if (candidate.content && candidate.content.parts && candidate.content.parts[0].text) {
-          return {
-            functionName: 'conversation',
-            arguments: { response: candidate.content.parts[0].text },
-            confidence: 0.5,
-            reasoning: 'No function call returned, treating as conversation'
-          };
-        }
-      }
-      // Fallback to keyword logic
-      return this.fallbackIntentParsing(userText, context);
+      const openRouterResult = await this.tryOpenRouter(userText, context);
+      if (openRouterResult) return openRouterResult;
     } catch (error) {
-      this.log('Error parsing intent:', error);
-      // Fallback to simple keyword matching
-      return this.fallbackIntentParsing(userText, context);
+      this.log('OpenRouter failed, falling back to Gemini:', error);
     }
+    // 2. Try Gemini
+    try {
+      const geminiResult = await this.tryGemini(userText, context);
+      if (geminiResult) return geminiResult;
+    } catch (error) {
+      this.log('Gemini failed, falling back to fallbackIntentParsing:', error);
+    }
+    // 3. Fallback
+    return this.fallbackIntentParsing(userText, context);
+  }
+
+  private async tryOpenRouter(userText: string, context: Context): Promise<IntentResult | null> {
+    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+    if (!OPENROUTER_API_KEY) throw new Error('OpenRouter API key not set.');
+    const url = 'https://openrouter.ai/api/v1/chat/completions';
+    const availableFunctions = registry.getManifests();
+    if (availableFunctions.length === 0) throw new Error('No plugins available for function calling');
+    const tools = availableFunctions.map(func => ({
+      type: 'function',
+      function: {
+        name: func.name,
+        description: func.description,
+        parameters: func.parameters
+      }
+    }));
+    const systemPrompt = this.buildSystemPrompt(context);
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userText }
+    ];
+    const body = {
+      model: 'openai/gpt-4o',
+      messages,
+      tools,
+      tool_choice: 'auto',
+      max_tokens: 1024
+    };
+    const headers = {
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json'
+    };
+    this.log('Sending to OpenRouter:', JSON.stringify(body, null, 2));
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+    const data = await response.json();
+    this.log('OpenRouter response:', data);
+    if (
+      data.choices &&
+      data.choices[0] &&
+      data.choices[0].message &&
+      data.choices[0].message.tool_calls &&
+      data.choices[0].message.tool_calls.length > 0
+    ) {
+      const toolCall = data.choices[0].message.tool_calls[0];
+      return {
+        functionName: toolCall.function.name,
+        arguments: JSON.parse(toolCall.function.arguments),
+        confidence: 0.98,
+        reasoning: 'OpenRouter function_call response'
+      };
+    }
+    if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+      return {
+        functionName: 'conversation',
+        arguments: { response: data.choices[0].message.content },
+        confidence: 0.5,
+        reasoning: 'No function call returned, treating as conversation (OpenRouter)'
+      };
+    }
+    return null;
+  }
+
+  private async tryGemini(userText: string, context: Context): Promise<IntentResult | null> {
+    const availableFunctions = registry.getManifests();
+    if (availableFunctions.length === 0) throw new Error('No plugins available for function calling');
+    const functions = availableFunctions.map(func => ({
+      name: func.name,
+      description: func.description,
+      parameters: func.parameters
+    }));
+    const systemPrompt = this.buildSystemPrompt(context);
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userText }
+    ];
+    const response = await openai.chat.completions.create({
+      model: 'gemini-1.5-flash',
+      messages: messages as any,
+      functions
+    });
+    this.log('Gemini response:', response);
+    const choice = response.choices && response.choices[0];
+    if (choice && choice.message && choice.message.function_call) {
+      const { name, arguments: argsStr } = choice.message.function_call;
+      let args = {};
+      try {
+        args = argsStr ? JSON.parse(argsStr) : {};
+      } catch (e) {
+        this.log('Failed to parse function_call arguments as JSON:', argsStr);
+      }
+      this.log(`Intent parsed: ${name} with args:`, args);
+      return {
+        functionName: name,
+        arguments: args,
+        confidence: 0.95,
+        reasoning: 'Gemini (OpenAI) function_call response'
+      };
+    }
+    if (choice && choice.message && choice.message.content) {
+      return {
+        functionName: 'conversation',
+        arguments: { response: choice.message.content },
+        confidence: 0.5,
+        reasoning: 'No function call returned, treating as conversation (Gemini)'
+      };
+    }
+    return null;
   }
 
   private buildSystemPrompt(context: Context): string {
@@ -101,36 +158,11 @@ export class IntentParser {
 Current Context:
 - Active Application: ${context.activeApp}
 - Window Title: ${context.windowTitle}
-- Clipboard Content: ${context.clipboardContent.substring(0, 200)}${context.clipboardContent.length > 200 ? '...' : ''}
-- Recent Commands: ${context.recentCommands.slice(-3).join(', ')}
+- Clipboard Content: ${context.clipboardContent?.substring(0, 200) || ''}${context.clipboardContent && context.clipboardContent.length > 200 ? '...' : ''}
+- Recent Commands: ${context.recentCommands?.slice(-3).join(', ') || ''}
 - Screen Text: ${context.screenText?.substring(0, 100) || 'None'}${context.screenText && context.screenText.length > 100 ? '...' : ''}
 `;
-
-    return `You are Friday, an advanced AI assistant that can control the user's computer and perform various tasks.
-
-${contextInfo}
-
-CRITICAL INSTRUCTIONS:
-1. ALWAYS try to use the available functions to perform actions rather than just providing information
-2. If the user asks for something that can be done with a function, use the function
-3. Only provide conversational responses for general questions that don't require system actions
-4. Be precise with function arguments - extract the exact information the user wants
-5. If the user's request is ambiguous, ask for clarification or make reasonable assumptions
-6. When opening applications, prefer native apps over web versions unless specifically requested
-
-FUNCTION MAPPING GUIDE:
-- For opening applications: Use 'open_app' with appName parameter
-- For opening websites/URLs: Use 'open_url' with url parameter  
-- For web searches: Use 'open_url' with the search query as url parameter
-- For email composition: Use 'email_draft' with recipient, subject, and body parameters
-
-EXAMPLES:
-- "open Chrome" → open_app with appName: "chrome"
-- "search for cats" → open_url with url: "cats" (will be treated as search)
-- "open google.com" → open_url with url: "https://google.com"
-- "email john@example.com" → email_draft with recipient: "john@example.com"
-
-Available functions are provided below. Choose the most appropriate one based on the user's request.`;
+    return `You are Friday, an advanced AI assistant that can control the user's computer and perform various tasks.\n\n${contextInfo}\n\nCRITICAL INSTRUCTIONS:\n1. ALWAYS try to use the available functions to perform actions rather than just providing information\n2. If the user asks for something that can be done with a function, use the function\n3. Only provide conversational responses for general questions that don't require system actions\n4. Be precise with function arguments - extract the exact information the user wants\n5. If the user's request is ambiguous, ask for clarification or make reasonable assumptions\n6. When opening applications, prefer native apps over web versions unless specifically requested\n\nFUNCTION MAPPING GUIDE:\n- For opening applications: Use 'open_app' with appName parameter\n- For opening websites/URLs: Use 'open_url' with url parameter  \n- For web searches: Use 'open_url' with the search query as url parameter\n- For email composition: Use 'email_draft' with recipient, subject, and body parameters\n\nEXAMPLES:\n- \"open Chrome\" → open_app with appName: \"chrome\"\n- \"search for cats\" → open_url with url: \"cats\" (will be treated as search)\n- \"open google.com\" → open_url with url: \"https://google.com\"\n- \"email john@example.com\" → email_draft with recipient: \"john@example.com\"\n\nAvailable functions are provided below. Choose the most appropriate one based on the user's request.`;
   }
 
   private fallbackIntentParsing(userText: string, context: Context): IntentResult {
