@@ -86,7 +86,7 @@ const Settings: React.FC<SettingsProps> = () => {
             <p className="text-gray-300">Configure your AI desktop assistant</p>
           </div>
 
-          <div className="glass rounded-2xl overflow-hidden">
+          <div className="glassmorphic glass rounded-2xl overflow-hidden bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl">
             <div className="flex border-b border-white/10">
               {tabs.map((tab) => (
                 <button
