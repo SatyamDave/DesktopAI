@@ -16,4 +16,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Basic system info
   getAppStatus: () => ipcRenderer.invoke('get-app-status'),
+});
+
+// Expose Friday API to renderer process
+contextBridge.exposeInMainWorld('friday', {
+  // Command processing
+  processCommand: (command) => 
+    ipcRenderer.invoke('friday-process-command', command),
+  
+  // Plugin management
+  getPlugins: () => 
+    ipcRenderer.invoke('friday-get-plugins'),
+  
+  reloadPlugin: (pluginName) => 
+    ipcRenderer.invoke('friday-reload-plugin', pluginName),
+  
+  reloadAllPlugins: () => 
+    ipcRenderer.invoke('friday-reload-all-plugins'),
+  
+  // Stats and context
+  getStats: () => 
+    ipcRenderer.invoke('friday-get-stats'),
+  
+  getContext: () => 
+    ipcRenderer.invoke('friday-get-context'),
+  
+  // Status
+  getStatus: () => 
+    ipcRenderer.invoke('friday-get-status'),
 }); 

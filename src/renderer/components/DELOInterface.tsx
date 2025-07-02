@@ -40,7 +40,7 @@ export const DELOInterface: React.FC = () => {
     try {
       const response = await window.electronAPI.getDeloSuggestions();
       if (response.success) {
-        setSuggestions(response.suggestions);
+        setSuggestions(response.suggestions || []);
       }
     } catch (error) {
       console.error('Error loading suggestions:', error);

@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "outDir": "./plugins",
+    "rootDir": "./plugins",
+    "module": "CommonJS",
+    "target": "ES2020",
+    "esModuleInterop": true,
+    "allowJs": true,
+    "declaration": false,
+    "noEmit": false,
+    "moduleResolution": "node"
+  },
+  "include": ["plugins/**/*.ts"]
+} 

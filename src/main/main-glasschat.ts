@@ -2,16 +2,25 @@ import { app, BrowserWindow, screen, globalShortcut, ipcMain, shell, clipboard }
 import * as path from 'path';
 import * as child_process from 'child_process';
 import fetch from 'node-fetch';
+import OpenAI from 'openai';
 require('dotenv').config();
+
+// Import Friday core
+import { Friday } from './core/friday';
+const friday = new Friday();
 
 class GlassChatApp {
   private mainWindow: BrowserWindow | null = null;
   private isDev: boolean;
+  private fridayInitialized: boolean = false;
 
   constructor() {
     this.isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+    // Enable debug mode for plugin loading
+    process.env.DEBUG_MODE = 'true';
     
-    app.whenReady().then(() => {
+    app.whenReady().then(async () => {
+      await this.initializeFriday();
       this.createMainWindow();
       this.setupGlobalShortcuts();
       this.setupIPC();
@@ -28,6 +37,18 @@ class GlassChatApp {
         this.createMainWindow();
       }
     });
+  }
+
+  private async initializeFriday() {
+    try {
+      console.log('🤖 Initializing Friday AI Assistant...');
+      await friday.initialize();
+      this.fridayInitialized = true;
+      console.log('✅ Friday initialized successfully');
+    } catch (error) {
+      console.error('❌ Error initializing Friday:', error);
+      this.fridayInitialized = false;
+    }
   }
 
   private createMainWindow() {
@@ -55,15 +76,15 @@ class GlassChatApp {
         show: false,
         titleBarStyle: 'hidden',
         webPreferences: {
-          preload: path.join(__dirname, 'preload.js'),
+          preload: path.join(__dirname, 'preload-working.js'),
           contextIsolation: true,
           nodeIntegration: false,
           webSecurity: false
         }
       });
 
-      // Use the correct port that Vite is running on
-      const url = this.isDev ? 'http://localhost:3001?glasschat=true' : `file://${path.join(__dirname, '../../dist/renderer/index.html')}?glasschat=true`;
+      // Use the built file for the UI, always
+      const url = `file://${path.join(__dirname, '../../dist/renderer/index.html')}?glasschat=true`;
       console.log(`🚀 Loading URL: ${url}`);
       
       this.mainWindow.loadURL(url);
@@ -146,20 +167,212 @@ class GlassChatApp {
     });
 
     // Handle AI processing
-    ipcMain.handle('process-ai-input', async (event, input: string) => {
+    ipcMain.handle('process-ai-input', async (event, input) => {
       try {
-        console.log(`🤖 Processing AI input: "${input}"`);
-        return { 
-          success: true, 
-          result: `I understand: ${input}. How can I help you?`
-        };
+        const provider = process.env.LLM_PROVIDER || 'groq';
+        if (provider === 'openai') {
+          // Use OpenAI Node SDK
+          const openaiApiKey = process.env.OPENAI_API_KEY;
+          if (!openaiApiKey) {
+            return { success: false, error: 'OpenAI API key not set.' };
+          }
+          const client = new OpenAI({ apiKey: openaiApiKey });
+          const response = await client.chat.completions.create({
+            model: 'gpt-4.0', // or 'gpt-4.1' if available
+            messages: [
+              { role: 'system', content: 'You are a helpful, friendly, and witty AI assistant.' },
+              { role: 'user', content: input }
+            ]
+          });
+          const text = response.choices?.[0]?.message?.content || '';
+          return { success: true, result: text };
+        } else {
+          // Use Groq API (OpenAI-compatible)
+          const apiKey = process.env.GROQ_API_KEY || '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';
+          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'llama-3-70b-8192',
+              messages: [
+                { role: 'system', content: 'You are a helpful, friendly, and witty AI assistant.' },
+                { role: 'user', content: input }
+              ]
+            })
+          });
+          const data = await response.json();
+          if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+            return { success: true, result: data.choices[0].message.content };
+          } else {
+            return { success: false, error: 'No response from Groq LLM.' };
+          }
+        }
       } catch (error) {
-        console.error('❌ AI processing error:', error);
-        return { success: false, error: (error as Error).message };
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
       }
     });
 
-    // Modular DELO automation handler
+    // Friday AI command processing
+    ipcMain.handle('friday-process-command', async (event, command: string) => {
+      try {
+        console.log('[Friday] IPC called with command:', command);
+        if (!this.fridayInitialized) {
+          return { 
+            success: false, 
+            error: 'Friday AI is not initialized',
+            message: 'Friday AI system is not ready'
+          };
+        }
+        let result = await friday.processCommand(command);
+        console.log('[Friday] Result:', result);
+        if (!result.success) {
+          // Fallback to Groq LLM
+          try {
+            console.log('[Friday] Falling back to Groq LLM...');
+            const apiKey = process.env.GROQ_API_KEY || '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';
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                model: 'llama-3-70b-8192',
+                messages: [
+                  { role: 'system', content: 'You are a helpful, friendly, and witty AI assistant.' },
+                  { role: 'user', content: command }
+                ]
+              })
+            });
+            const data = await response.json();
+            if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+              return { success: true, message: data.choices[0].message.content };
+            } else {
+              console.log('[Friday] Groq LLM returned no result, falling back to Gemini...');
+              // Fallback to Gemini
+              const geminiApiKey = process.env.GEMINI_API_KEY;
+              if (!geminiApiKey) return { success: false, message: 'Gemini API key not set.' };
+              const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + geminiApiKey;
+              const body = { contents: [{ parts: [{ text: command }] }] };
+              const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+              });
+              const geminiData = await res.json();
+              if (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content && geminiData.candidates[0].content.parts[0].text) {
+                return { success: true, message: geminiData.candidates[0].content.parts[0].text };
+              }
+              return { success: false, message: 'Could not get a response from Groq or Gemini.' };
+            }
+          } catch (llmError) {
+            console.error('[Friday] LLM fallback error:', llmError);
+            return { success: false, message: 'LLM fallback error: ' + String(llmError) };
+          }
+        }
+        return {
+          success: result.success,
+          message: result.message,
+          data: result.data,
+          error: result.error,
+          intent: result.intent,
+          executionTime: result.executionTime,
+          confidence: result.confidence
+        };
+      } catch (error: any) {
+        console.error('❌ Friday command processing error:', error);
+        return { 
+          success: false, 
+          error: error.message,
+          message: 'Failed to process command'
+        };
+      }
+    });
+
+    // Friday plugin management
+    ipcMain.handle('friday-get-plugins', async () => {
+      try {
+        if (!this.fridayInitialized) {
+          return { plugins: [], manifests: [], stats: {} };
+        }
+        return {
+          plugins: friday.getAvailablePlugins(),
+          manifests: friday.getPluginManifests(),
+          stats: friday.getRegistryStats()
+        };
+      } catch (error: any) {
+        console.error('❌ Error getting plugins:', error);
+        return { plugins: [], manifests: [], stats: {} };
+      }
+    });
+
+    ipcMain.handle('friday-reload-plugin', async (event, pluginName: string) => {
+      try {
+        if (!this.fridayInitialized) {
+          return { success: false, error: 'Friday AI is not initialized' };
+        }
+        await friday.reloadPlugin(pluginName);
+        return { success: true, message: `Plugin ${pluginName} reloaded` };
+      } catch (error: any) {
+        console.error('❌ Error reloading plugin:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('friday-reload-all-plugins', async () => {
+      try {
+        if (!this.fridayInitialized) {
+          return { success: false, error: 'Friday AI is not initialized' };
+        }
+        await friday.reloadAllPlugins();
+        return { success: true, message: 'All plugins reloaded' };
+      } catch (error: any) {
+        console.error('❌ Error reloading all plugins:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Friday stats and context
+    ipcMain.handle('friday-get-stats', async () => {
+      try {
+        if (!this.fridayInitialized) {
+          return { stats: null };
+        }
+        return { stats: friday.getStats() };
+      } catch (error: any) {
+        console.error('❌ Error getting stats:', error);
+        return { stats: null };
+      }
+    });
+
+    ipcMain.handle('friday-get-context', async () => {
+      try {
+        if (!this.fridayInitialized) {
+          return { context: null };
+        }
+        return { context: await friday.getCurrentContext() };
+      } catch (error: any) {
+        console.error('❌ Error getting context:', error);
+        return { context: null };
+      }
+    });
+
+    ipcMain.handle('friday-get-status', async () => {
+      try {
+        return { 
+          initialized: this.fridayInitialized,
+          stats: this.fridayInitialized ? friday.getStats() : null
+        };
+      } catch (error: any) {
+        console.error('❌ Error getting status:', error);
+        return { initialized: false, stats: null };
+      }
+    });
+
+    // Modular DELO automation handler (fallback)
     ipcMain.handle('process-delo-command', async (event, { command }) => {
       try {
         const lower = command.toLowerCase();
@@ -220,7 +433,8 @@ class GlassChatApp {
       return {
         isVisible: this.mainWindow?.isVisible() || false,
         isDev: this.isDev,
-        platform: process.platform
+        platform: process.platform,
+        fridayInitialized: this.fridayInitialized
       };
     });
 

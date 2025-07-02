@@ -66,50 +66,49 @@ export class DELOIntegrationService {
     }
   }
 
+  /**
+   * Refactored: Always use AgenticCommandProcessor for all commands.
+   * This is now a thin wrapper for agenticCommandProcessor.
+   */
   public async processDELOCommand(input: string): Promise<DELOResponse> {
     await this.initialize();
-    
     try {
-      // Update context
+      // Update context (optional, for memory)
       await this.updateContext();
-      
-      // Process command with memory awareness
+      // Process command agentically
       const result = await agenticCommandProcessor.processCommand(input);
-      
       // Get current context
       const context = await this.getCurrentContext();
-      
+      // Adapt fallback string to nextAction object if present
+      let nextAction: { suggestion: string; confidence: number; basedOn: string } | undefined = undefined;
+      if (result.fallback && typeof result.fallback === 'string') {
+        nextAction = {
+          suggestion: result.fallback,
+          confidence: 0.7,
+          basedOn: 'agentic-fallback'
+        };
+      }
       // Build DELO response
       const deloResponse: DELOResponse = {
         success: result.success,
         message: result.message,
-        action: this.determineAction(result),
+        action: result.success ? 'executed' : 'error',
         context,
-        memory: result.data?.isDuplicate || result.data?.isSimilar ? {
-          isDuplicate: result.data.isDuplicate,
-          previousTask: result.data.previousTask,
-          similarity: result.data.similarity
-        } : undefined
+        memory: undefined,
+        nextAction,
+        suggestions: []
       };
-
-      // Add next action suggestions
-      if (result.data?.nextAction) {
-        deloResponse.nextAction = result.data.nextAction;
-      }
-
-      // Add contextual suggestions
-      deloResponse.suggestions = await this.generateContextualSuggestions(context, input);
-
-      console.log(`🧠 DELO processed: "${input}" -> ${result.success ? 'success' : 'failed'}`);
       return deloResponse;
-
     } catch (error) {
       console.error('❌ Error in DELO processing:', error);
       return {
         success: false,
         message: 'I encountered an error while processing your request.',
         action: 'error',
-        context: await this.getCurrentContext()
+        context: await this.getCurrentContext(),
+        memory: undefined,
+        nextAction: undefined,
+        suggestions: []
       };
     }
   }

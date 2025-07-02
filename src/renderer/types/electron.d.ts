@@ -106,6 +106,66 @@ declare global {
       onMeeting: (callback: (data: any) => void) => void;
       onUrgent: (callback: (data: any) => void) => void;
     };
+    
+    // Friday AI Assistant Interface
+    friday: {
+      // Core methods
+      processCommand: (command: string) => Promise<{ 
+        success: boolean; 
+        message: string; 
+        data?: any; 
+        error?: string; 
+        intent?: any; 
+        executionTime?: number; 
+        confidence?: number 
+      }>;
+      getStatus: () => Promise<{ 
+        initialized: boolean; 
+        stats: any; 
+        registryStats: any 
+      }>;
+      getPlugins: () => Promise<{ 
+        plugins: string[]; 
+        manifests: any[]; 
+        stats: any 
+      }>;
+      getContext: () => Promise<{ 
+        success: boolean; 
+        context?: any; 
+        error?: string 
+      }>;
+      parseIntent: (text: string) => Promise<{ 
+        success: boolean; 
+        intent?: any; 
+        error?: string 
+      }>;
+      
+      // Plugin management
+      reloadPlugin: (pluginName: string) => Promise<{ 
+        success: boolean; 
+        result?: any; 
+        error?: string 
+      }>;
+      reloadAllPlugins: () => Promise<{ 
+        success: boolean; 
+        result?: any; 
+        error?: string 
+      }>;
+      getStats: () => Promise<{ 
+        success: boolean; 
+        stats?: any; 
+        error?: string 
+      }>;
+      
+      // Event listeners
+      onInitialized: (callback: (data: any) => void) => void;
+      onCommandStart: (callback: (data: any) => void) => void;
+      onIntentParsed: (callback: (data: any) => void) => void;
+      onCommandComplete: (callback: (data: any) => void) => void;
+      onCommandError: (callback: (data: any) => void) => void;
+      onPluginReloaded: (callback: (data: any) => void) => void;
+      onAllPluginsReloaded: (callback: (data: any) => void) => void;
+    };
   }
 }
 

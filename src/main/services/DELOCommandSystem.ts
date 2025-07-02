@@ -20,6 +20,7 @@ import { PatternDetectionService } from './PatternDetectionService';
 import { RealTimeAudioService } from './RealTimeAudioService';
 import { RealTimeVisualService } from './RealTimeVisualService';
 import { SensoryIntelligenceService } from './SensoryIntelligenceService';
+import { agenticCommandProcessor } from './AgenticCommandProcessor';
 
 const execAsync = promisify(exec);
 
@@ -289,104 +290,32 @@ export class DELOCommandSystem extends EventEmitter {
     this.commands.set(command.name, command);
   }
 
+  /**
+   * Refactored: Always use AgenticCommandProcessor for all commands.
+   * This is now a thin wrapper for agenticCommandProcessor.
+   */
   public async processCommand(input: string): Promise<DeloCommandResult> {
-    await this.initialize();
-    
-    const startTime = Date.now();
-    
-    try {
-      // Spell correction
-      const correctedInput = this.autoCorrectInput(input);
-      if (this.debug && correctedInput !== input) {
-        console.log(`[SpellCorrect] "${input}" → "${correctedInput}"`);
-      }
-      
-      // Get current context
-      const context = await this.getCurrentContext();
-      
-      // Check for duplicate/similar actions
-      const duplicateCheck = await this.checkForDuplicates(correctedInput, context);
-      if (duplicateCheck.isDuplicate) {
-        return {
-          success: false,
-          message: `This action was recently performed. ${duplicateCheck.suggestion}`,
-          action: 'duplicate_warning',
-          data: duplicateCheck
-        };
-      }
+    // Forward the input to the agentic processor
+    const result = await agenticCommandProcessor.processCommand(input);
 
-      // Check if this is a workflow trigger
-      const workflowResult = await this.tryWorkflowExecution(correctedInput, context);
-      if (workflowResult) {
-        return workflowResult;
-      }
+    // Optionally update session memory (if needed for analytics/habits)
+    this.updateSessionMemory(input, {
+      clipboardContent: '',
+      activeApp: '',
+      windowTitle: '',
+      recentCommands: [],
+      sessionDuration: 0
+    }, result as any);
 
-      // Parse intent and extract arguments
-      const { intent, args } = await this.parseIntent(correctedInput, context);
-      context.userIntent = intent;
-      context.extractedArgs = args;
-
-      // Fuzzy command matching with confidence
-      const { command, confidence, suggestion } = this.fuzzyFindMatchingCommand(intent, correctedInput, context);
-      if (!command) {
-        // LLM fallback if available
-        const llmSuggestion = await this.llmFallback(correctedInput);
-        if (llmSuggestion) {
-          return {
-            success: false,
-            message: `Did you mean: ${llmSuggestion}? Click to confirm.`,
-            action: 'suggestion',
-            data: { suggestion: llmSuggestion }
-          };
-        }
-        return {
-          success: false,
-          message: `I don't understand how to "${intent}". Try being more specific.`,
-          action: 'no_match',
-          data: { suggestions: this.getClosestCommandSuggestions(correctedInput) }
-        };
-      }
-
-      // If confidence is low, ask for confirmation
-      if (confidence < this.confidenceThreshold) {
-        return {
-          success: false,
-          message: `Did you mean: ${suggestion}? (Confidence: ${(confidence*100).toFixed(0)}%) Click to confirm.`,
-          action: 'low_confidence',
-          data: { suggestion, confidence }
-        };
-      }
-
-      // Execute command
-      const result = await command.execute(context, args);
-      
-      // Record action for pattern detection
-      const duration = Date.now() - startTime;
-      if (this.patternDetection) {
-        await this.patternDetection.recordAction(correctedInput, context, result, duration);
-      }
-      
-      // Update session memory
-      this.updateSessionMemory(correctedInput, context, result);
-      
-      // Generate next action suggestion
-      const nextAction = this.generateNextActionSuggestion(context, result);
-      if (nextAction) {
-        result.nextAction = nextAction;
-      }
-
-      console.log(`🧠 DELO executed: "${correctedInput}" -> ${command.name} (${result.success ? 'success' : 'failed'})`);
-      return result;
-
-    } catch (error) {
-      console.error('❌ Error in DELO command processing:', error);
-      return {
-        success: false,
-        message: 'I encountered an error while processing your request.',
-        action: 'error',
-        data: { error: String(error) }
-      };
-    }
+    // Adapt result to DeloCommandResult interface if needed
+    return {
+      success: result.success,
+      message: result.message,
+      action: result.success ? 'executed' : 'error',
+      data: result.data,
+      nextAction: result.fallback || undefined,
+      requiresConfirmation: false
+    };
   }
 
   private autoCorrectInput(input: string): string {
