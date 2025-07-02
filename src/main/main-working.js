@@ -45,6 +45,79 @@ function createTray() {
   }
 }
 
+function createFloatingWindow() {
+  try {
+    console.log('🪟 Creating floating orb window...');
+    
+    // Get screen dimensions for better positioning
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+    
+    // Make the window larger to ensure the orb is visible
+    const orbSize = 120;
+    const margin = 30;
+    const x = screenWidth - orbSize - margin;
+    const y = screenHeight - orbSize - margin;
+    
+    const floatingWindow = new BrowserWindow({
+      width: screenWidth,
+      height: screenHeight,
+      x: 0,
+      y: 0,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      show: false,
+      titleBarStyle: 'hidden',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload-working.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        webSecurity: false
+      }
+    });
+
+    // Load the regular React-based orb overlay
+    const orbUrl = isDev
+      ? 'http://localhost:3000/orb'
+      : `file://${path.join(__dirname, '../renderer/index.html')}?orb`;
+
+    console.log(`🚀 Loading orb overlay: ${orbUrl}`);
+    floatingWindow.loadURL(orbUrl);
+
+    floatingWindow.on('ready-to-show', () => {
+      console.log('✅ Orb window ready to show');
+      floatingWindow.show();
+      floatingWindow.focus();
+    });
+
+    floatingWindow.webContents.on('did-finish-load', () => {
+      console.log('✅ Orb page finished loading');
+      setTimeout(() => {
+        floatingWindow.show();
+        floatingWindow.focus();
+      }, 500);
+    });
+
+    floatingWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+      console.error(`❌ Failed to load ${validatedURL}: ${errorDescription}`);
+    });
+
+    floatingWindow.on('close', (event) => {
+      event.preventDefault();
+      floatingWindow.hide();
+    });
+
+    console.log('✅ Floating orb window created successfully');
+  } catch (error) {
+    console.error('❌ Error creating floating orb window:', error);
+  }
+}
+
 function setupGlobalShortcuts() {
   try {
     // Alt + D to toggle orb visibility (show/hide)
