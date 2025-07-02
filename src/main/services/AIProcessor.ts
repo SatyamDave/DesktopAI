@@ -473,9 +473,10 @@ export class AIProcessor {
         }
       );
     } else {
-      // OpenAI
+      // OpenAI or OpenRouter (custom base URL)
+      const openaiApiBase = process.env.OPENAI_API_BASE || 'https://api.openai.com/v1';
       response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
+        `${openaiApiBase}/chat/completions`,
         {
           model: 'gpt-3.5-turbo',
           messages: [

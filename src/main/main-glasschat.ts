@@ -83,6 +83,10 @@ class GlassChatApp {
         }
       });
 
+      // Set window background and vibrancy for glassmorphic effect
+      this.mainWindow.setBackgroundColor('#00000000');
+      this.mainWindow.setVibrancy('sidebar');
+
       // Use the built file for the UI, always
       const url = `file://${path.join(__dirname, '../../dist/renderer/index.html')}?glasschat=true`;
       console.log(`🚀 Loading URL: ${url}`);
