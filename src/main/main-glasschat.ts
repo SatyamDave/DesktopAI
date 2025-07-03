@@ -3,30 +3,57 @@ import * as path from 'path';
 import * as child_process from 'child_process';
 import fetch from 'node-fetch';
 import OpenAI from 'openai';
+<<<<<<< HEAD
 import { startStream } from '../audio/capturer';
+=======
+import screenshot from 'screenshot-desktop';
+import Tesseract from 'tesseract.js';
+import { Window as NodeWindow } from 'node-screenshots';
+>>>>>>> 9812c5b5c7957c5946b9049cedfc29d86f039d29
 require('dotenv').config();
 
 // Import Friday core
 import { Friday } from './core/friday';
+<<<<<<< HEAD
 import { runUserIntent } from './core/intentParser';
+=======
+// import { ScreenPerception } from './services/ScreenPerception';
+>>>>>>> 9812c5b5c7957c5946b9049cedfc29d86f039d29
 const friday = new Friday();
 
 class GlassChatApp {
   private mainWindow: BrowserWindow | null = null;
   private isDev: boolean;
   private fridayInitialized: boolean = false;
+  // private screenPerception: ScreenPerception;
+  private latestScreenText: string = '';
+  private latestScreenTimestamp: number = 0;
+  private ocrInterval: NodeJS.Timeout | null = null;
 
   constructor() {
+    console.log('GlassChatApp: constructor start');
     this.isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-    // Enable debug mode for plugin loading
     process.env.DEBUG_MODE = 'true';
+    console.log('GlassChatApp: isDev set, DEBUG_MODE set');
+    
+    app.disableHardwareAcceleration();
     
     app.whenReady().then(async () => {
+      console.log('GlassChatApp: app.whenReady');
       await this.initializeFriday();
+      console.log('GlassChatApp: Friday initialized');
       this.createMainWindow();
+      console.log('GlassChatApp: Main window created');
       this.setupGlobalShortcuts();
+      console.log('GlassChatApp: Global shortcuts set up');
       this.setupIPC();
+<<<<<<< HEAD
       this.startAudioPipeline();
+=======
+      console.log('GlassChatApp: IPC set up');
+      // Disabled automatic background OCR - only scan when user requests it
+      // this.startBackgroundScreenOCR();
+>>>>>>> 9812c5b5c7957c5946b9049cedfc29d86f039d29
     });
 
     app.on('window-all-closed', () => {
@@ -40,23 +67,27 @@ class GlassChatApp {
         this.createMainWindow();
       }
     });
+
+    // this.screenPerception = new ScreenPerception();
+    // this.screenPerception.init();
+    console.log('GlassChatApp: constructor end');
   }
 
   private async initializeFriday() {
     try {
-      console.log('🤖 Initializing Friday AI Assistant...');
+      console.log('Initializing Friday AI Assistant...');
       await friday.initialize();
       this.fridayInitialized = true;
-      console.log('✅ Friday initialized successfully');
+      console.log('Friday initialized successfully');
     } catch (error) {
-      console.error('❌ Error initializing Friday:', error);
+      console.error('Error initializing Friday:', error);
       this.fridayInitialized = false;
     }
   }
 
   private createMainWindow() {
     try {
-      console.log('🚀 Starting GlassChat App...');
+      console.log('Creating GlassChat main window...');
       
       // Get screen dimensions for full screen coverage
       const primaryDisplay = screen.getPrimaryDisplay();
@@ -79,6 +110,7 @@ class GlassChatApp {
         show: false,
         titleBarStyle: 'hidden',
         webPreferences: {
+          // Use join to ensure correct path in production (dist/main)
           preload: path.join(__dirname, 'preload-working.js'),
           contextIsolation: true,
           nodeIntegration: false,
@@ -117,14 +149,15 @@ class GlassChatApp {
         this.mainWindow?.hide();
       });
 
-      console.log('✅ GlassChat window created successfully');
+      console.log('GlassChat main window created');
     } catch (error) {
-      console.error('❌ Error creating GlassChat window:', error);
+      console.error('Error creating GlassChat window:', error);
     }
   }
 
   private setupGlobalShortcuts() {
     try {
+      console.log('Setting up global shortcuts...');
       // Alt + D to toggle GlassChat visibility
       globalShortcut.register('Alt+D', () => {
         if (this.mainWindow) {
@@ -147,13 +180,122 @@ class GlassChatApp {
         }
       });
 
-      console.log('✅ Global shortcuts registered successfully');
+      console.log('Global shortcuts registered successfully');
     } catch (error) {
-      console.error('❌ Error setting up global shortcuts:', error);
+      console.error('Error setting up global shortcuts:', error);
     }
   }
 
   private setupIPC() {
+    console.log('Setting up IPC handlers...');
+    // IPC handlers to hide/show DELO overlay
+    ipcMain.handle('hide-delo-overlay', async () => {
+      if (this.mainWindow) {
+        this.mainWindow.hide();
+        return { success: true };
+      }
+      return { success: false, error: 'No main window' };
+    });
+    ipcMain.handle('show-delo-overlay', async () => {
+      if (this.mainWindow) {
+        this.mainWindow.show();
+        return { success: true };
+      }
+      return { success: false, error: 'No main window' };
+    });
+    // Handle screen reading request
+    ipcMain.handle('read-screen-text', async () => {
+      try {
+        console.log('📖 Reading screen text...');
+        const { screenOCRService } = require('./services/ScreenOCRService');
+        
+        // Initialize the service if not already done
+        if (!screenOCRService.isInitialized) {
+          await screenOCRService.initialize();
+        }
+        
+        const text = await screenOCRService.forceCapture();
+        console.log('📖 Screen text extracted:', text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+        return { success: true, text };
+      } catch (error) {
+        console.error('❌ Error reading screen text:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
+    // Handle screenshot capture with region selection
+    ipcMain.handle('capture-screen-region', async (event, region: { x: number, y: number, width: number, height: number }) => {
+      try {
+        const MIN_REGION_WIDTH = 10;
+        const MIN_REGION_HEIGHT = 10;
+        if (!region || region.width < MIN_REGION_WIDTH || region.height < MIN_REGION_HEIGHT) {
+          return { success: false, error: `Selected region is too small to scan. Please select at least ${MIN_REGION_WIDTH}x${MIN_REGION_HEIGHT} pixels.` };
+        }
+        console.log('📸 Capturing screen region:', region);
+        const screenshot = await this.getRegionScreenshot(region);
+        if (!screenshot) {
+          return { success: false, error: 'Failed to capture screenshot' };
+        }
+        
+        // Run OCR on the screenshot
+        const { createWorker } = require('tesseract.js');
+        const worker = await createWorker('eng');
+        const { data: { text } } = await worker.recognize(screenshot);
+        await worker.terminate();
+        
+        if (!text.trim()) {
+          return { success: false, error: 'No text found in selected region' };
+        }
+        
+        // Process with LLM for summary and suggestions
+        const summary = await this.processScreenContent(text);
+        
+        return { 
+          success: true, 
+          summary: summary.summary,
+          suggestions: summary.suggestions,
+          text: text.trim()
+        };
+      } catch (error) {
+        console.error('❌ Screen region capture error:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
+    // Handle full screen capture and analysis
+    ipcMain.handle('capture-full-screen', async () => {
+      try {
+        console.log('📸 Capturing full screen');
+        const screenshot = await this.getRegionScreenshot();
+        if (!screenshot) {
+          return { success: false, error: 'Failed to capture screenshot' };
+        }
+        
+        // Run OCR on the screenshot
+        const { createWorker } = require('tesseract.js');
+        const worker = await createWorker('eng');
+        const { data: { text } } = await worker.recognize(screenshot);
+        await worker.terminate();
+        
+        if (!text.trim()) {
+          return { success: false, error: 'No text found on screen' };
+        }
+        
+        // Process with LLM for summary and suggestions
+        const summary = await this.processScreenContent(text);
+        
+        return { 
+          success: true, 
+          summary: summary.summary,
+          suggestions: summary.suggestions,
+          text: text.trim()
+        };
+      } catch (error) {
+        console.error('❌ Full screen capture error:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
     // Handle command execution
     ipcMain.handle('execute-command', async (event, command: string) => {
       try {
@@ -167,20 +309,36 @@ class GlassChatApp {
     });
 
     // Handle AI processing
+    const DELO_SYSTEM_PROMPT = `
+You are DELO, a friendly, helpful AI assistant who talks to the user like a smart, supportive friend.
+Be warm, conversational, and encouraging. Use natural, human language.
+If you suggest actions, explain them in a way that feels like you're personally helping the user.
+Always be positive and supportive, and make the user feel like they have a helpful companion.
+
+Analyze the screen content and provide:
+1. A friendly, conversational summary of what's visible
+2. 3-5 helpful suggestions for what the user might want to do next
+3. Focus only on the actual screen content, not UI elements or overlays
+
+Format your response as JSON:
+{
+  "summary": "friendly summary here",
+  "suggestions": ["suggestion 1", "suggestion 2", "suggestion 3"]
+}
+`;
     ipcMain.handle('process-ai-input', async (event, input) => {
       try {
         const provider = process.env.LLM_PROVIDER || 'groq';
         if (provider === 'openai') {
-          // Use OpenAI Node SDK
           const openaiApiKey = process.env.OPENAI_API_KEY;
           if (!openaiApiKey) {
             return { success: false, error: 'OpenAI API key not set.' };
           }
           const client = new OpenAI({ apiKey: openaiApiKey });
           const response = await client.chat.completions.create({
-            model: 'gpt-4.0', // or 'gpt-4.1' if available
+            model: 'gpt-4.0',
             messages: [
-              { role: 'system', content: 'You are a helpful, friendly, and witty AI assistant.' },
+              { role: 'system', content: DELO_SYSTEM_PROMPT },
               { role: 'user', content: input }
             ]
           });
@@ -198,7 +356,7 @@ class GlassChatApp {
             body: JSON.stringify({
               model: 'llama-3-70b-8192',
               messages: [
-                { role: 'system', content: 'You are a helpful, friendly, and witty AI assistant.' },
+                { role: 'system', content: DELO_SYSTEM_PROMPT },
                 { role: 'user', content: input }
               ]
             })
@@ -242,7 +400,7 @@ class GlassChatApp {
               body: JSON.stringify({
                 model: 'llama-3-70b-8192',
                 messages: [
-                  { role: 'system', content: 'You are a helpful, friendly, and witty AI assistant.' },
+                  { role: 'system', content: DELO_SYSTEM_PROMPT },
                   { role: 'user', content: command }
                 ]
               })
@@ -438,7 +596,178 @@ class GlassChatApp {
       };
     });
 
-    console.log('✅ IPC handlers setup complete');
+    ipcMain.handle('getDeloSuggestions', async () => {
+      try {
+        // Lightweight: get active window title and app name only
+        let appName = 'Unknown';
+        let windowTitle = 'Unknown';
+        if (process.platform === 'win32') {
+          // Use built-in Electron API for Windows
+          const { execSync } = require('child_process');
+          try {
+            // Use single quotes for PowerShell command and escape double quotes inside
+            windowTitle = execSync('powershell -Command "(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -ne \"\" } | Sort-Object StartTime -Descending | Select-Object -First 1).MainWindowTitle"', { encoding: 'utf8' }).trim();
+            appName = execSync('powershell -Command "(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -ne \"\" } | Sort-Object StartTime -Descending | Select-Object -First 1).ProcessName"', { encoding: 'utf8' }).trim();
+          } catch (e) {
+            // fallback: leave as Unknown
+          }
+        } else if (process.platform === 'darwin') {
+          // Use AppleScript for macOS
+          const { execSync } = require('child_process');
+          try {
+            const script = `tell application \"System Events\"\nset frontApp to name of first application process whose frontmost is true\nset frontWindow to name of first window of (first process whose frontmost is true)\nend tell\nreturn frontApp & \"|\" & frontWindow`;
+            const result = execSync(`osascript -e '${script}'`, { encoding: 'utf8' });
+            [appName, windowTitle] = result.trim().split('|');
+          } catch (e) {}
+        } else {
+          // Linux fallback
+          appName = process.title;
+          windowTitle = process.title;
+        }
+        let prompt = '';
+        if (appName !== 'Unknown' && windowTitle !== 'Unknown') {
+          prompt = `Given the app name and window title, suggest helpful actions for the user.\nApp: ${appName}\nTitle: ${windowTitle}`;
+        } else {
+          prompt = 'Suggest helpful actions for a desktop user based on common productivity tasks.';
+        }
+        // Call LLM (OpenRouter or fallback)
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        if (!apiKey) return { success: false, suggestions: [], error: 'OpenRouter API key not set.' };
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'openai/gpt-4o',
+            messages: [
+              { role: 'system', content: 'You are a helpful desktop assistant. Given the app name and window title, suggest helpful actions as a bullet list.' },
+              { role: 'user', content: prompt }
+            ],
+            max_tokens: 64,
+            temperature: 0.4
+          })
+        });
+        const data = await response.json();
+        let suggestions: string[] = [];
+        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+          // Parse bullet points from LLM output
+          const raw = data.choices[0].message.content;
+          suggestions = raw.split(/\n|\r/).map(s => s.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+        }
+        if (suggestions.length === 0) {
+          suggestions = ['Try searching the web', 'Summarize clipboard', 'Draft an email', 'Open a recent app'];
+        }
+        return { success: true, suggestions };
+      } catch (error) {
+        return { success: true, suggestions: ['Try searching the web', 'Summarize clipboard', 'Draft an email', 'Open a recent app'], error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
+    // Helper: get active window info (app name, window title)
+    ipcMain.handle('getActiveWindowInfo', () => {
+      let appName = 'Unknown';
+      let windowTitle = 'Unknown';
+      if (process.platform === 'win32') {
+        const { execSync } = require('child_process');
+        try {
+          windowTitle = execSync('powershell -Command "(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -ne \"\" } | Sort-Object StartTime -Descending | Select-Object -First 1).MainWindowTitle"', { encoding: 'utf8' }).trim();
+          appName = execSync('powershell -Command "(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -ne \"\" } | Sort-Object StartTime -Descending | Select-Object -First 1).ProcessName"', { encoding: 'utf8' }).trim();
+        } catch (e) {}
+      } else if (process.platform === 'darwin') {
+        const { execSync } = require('child_process');
+        try {
+          const script = `tell application \"System Events\"\nset frontApp to name of first application process whose frontmost is true\nset frontWindow to name of first window of (first process whose frontmost is true)\nend tell\nreturn frontApp & \"|\" & frontWindow`;
+          const result = execSync(`osascript -e '${script}'`, { encoding: 'utf8' });
+          [appName, windowTitle] = result.trim().split('|');
+        } catch (e) {}
+      } else {
+        appName = process.title;
+        windowTitle = process.title;
+      }
+      return { appName, windowTitle };
+    });
+
+    // Multi-window OCR: get text from all visible, non-minimized windows (excluding overlays)
+    ipcMain.handle('getDeloScreenSummary', async (event, region) => {
+      try {
+        let ocrText = '';
+        if (region) {
+          const imgBuffer = await this.getRegionScreenshot(region);
+          const preprocessed = await this.preprocessImageForOCR(imgBuffer);
+          const { data: { text } } = await Tesseract.recognize(preprocessed, 'eng');
+          ocrText = text;
+        } else {
+          ocrText = await this.getAllWindowsOCRText();
+          if (!ocrText) {
+            if (Date.now() - this.latestScreenTimestamp < 15000 && this.latestScreenText) {
+              ocrText = this.latestScreenText;
+            } else {
+              ocrText = await this.getFreshScreenText();
+            }
+          }
+        }
+        // Contextual awareness: clipboard, app name, window title
+        const clipboardText = clipboard.readText() || '';
+        const { appName, windowTitle } = this.getActiveWindowInfo();
+        let contextBlock = '';
+        if (clipboardText) contextBlock += `\n\nClipboard: ${clipboardText.substring(0, 500)}`;
+        if (appName && windowTitle) contextBlock += `\n\nActive App: ${appName}\nActive Window: ${windowTitle}`;
+        const prompt = `You are DELO, a floating AI desktop assistant.\n\nHere is the visible text from the user's screen:\n\n${ocrText}${contextBlock}\n\nYour task:\n1. Summarize what is happening on screen.\n2. Infer what the user is trying to do or needs help with.\n3. Suggest 1–3 helpful actions (e.g., summarize, translate, reply, search, automate, open app).\n4. Categorize the type of activity (e.g., email, coding, form filling, browsing, meeting, research, writing).\n\nReturn your output **only** in the following JSON format:\n\n\u0060\u0060\u0060json\n{\n  "summary": "<what's happening>",\n  "intent": "<inferred user goal>",\n  "suggestedActions": ["<Action 1>", "<Action 2>", "<Action 3>"],\n  "intentCategory": "<one-word category>"\n}\n\u0060\u0060\u0060`;
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        if (!apiKey) return { success: false, summary: '', suggestions: [], error: 'OpenRouter API key not set.' };
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'openai/gpt-4o',
+            messages: [
+              { role: 'system', content: DELO_SYSTEM_PROMPT },
+              { role: 'user', content: prompt }
+            ],
+            max_tokens: 256,
+            temperature: 0.4
+          })
+        });
+        const data = await response.json();
+        let summary = '';
+        let suggestions: string[] = [];
+        let intent = '';
+        let intentCategory = '';
+        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+          const raw = data.choices[0].message.content;
+          // Try to extract JSON from the response
+          const match = raw.match(/```json([\s\S]*?)```/);
+          let jsonStr = '';
+          if (match && match[1]) {
+            jsonStr = match[1];
+          } else {
+            // fallback: try to find first { ... }
+            const braceMatch = raw.match(/\{[\s\S]*\}/);
+            if (braceMatch) jsonStr = braceMatch[0];
+          }
+          try {
+            const parsed = JSON.parse(jsonStr);
+            summary = parsed.summary || '';
+            intent = parsed.intent || '';
+            suggestions = parsed.suggestedActions || [];
+            intentCategory = parsed.intentCategory || '';
+          } catch (e) {
+            summary = raw;
+            suggestions = [];
+          }
+        }
+        return { success: true, summary, suggestions, intent, intentCategory };
+      } catch (error) {
+        return { success: false, summary: '', suggestions: [], error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
+    console.log('IPC handlers setup complete');
   }
 
   private launchApp(appName: string) {
@@ -481,6 +810,7 @@ class GlassChatApp {
     }
   }
 
+<<<<<<< HEAD
   private startAudioPipeline() {
     // Start always-hearing audio pipeline and forward events to renderer
     try {
@@ -500,6 +830,259 @@ class GlassChatApp {
       });
     } catch (err) {
       console.error('Error starting audio pipeline:', err);
+=======
+  // Helper: get the best window for scanning (skip DELO/GlassChat/AgentMarket/empty)
+  private getBestScanWindow() {
+    const windows = require('node-screenshots').Window.all();
+    // Known DELO/overlay names to skip
+    const skipPatterns = [/glasschat/i, /delo/i, /agentmarket/i, /^$/i];
+    // Filter out overlay/self windows
+    const candidates = windows.filter(w => {
+      const title = (w.title || '').toLowerCase();
+      const app = (w.appName || '').toLowerCase();
+      return !skipPatterns.some(p => p.test(title) || p.test(app));
+    });
+    // Prefer maximized, not minimized, non-empty title
+    let best = candidates.find(w => !w.isMinimized && w.isMaximized && w.title && w.title.trim().length > 0);
+    if (!best && candidates.length > 0) best = candidates[0];
+    return best;
+  }
+
+  // Improved screen capture with cross-platform support
+  private async getRegionScreenshot(region?: { x: number, y: number, width: number, height: number }) {
+    const MIN_REGION_WIDTH = 10;
+    const MIN_REGION_HEIGHT = 10;
+    
+    try {
+      const { screen } = require('electron');
+      const { desktopCapturer } = require('electron');
+      
+      // Get all displays
+      const displays = screen.getAllDisplays();
+      const primaryDisplay = screen.getPrimaryDisplay();
+      
+      // Use Electron's desktopCapturer for better cross-platform support
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: 1920, height: 1080 }
+      });
+      
+      if (sources.length === 0) {
+        throw new Error('No screen sources available');
+      }
+      
+      // Get the primary screen source
+      const source = sources.find(s => s.display_id === primaryDisplay.id.toString()) || sources[0];
+      
+      if (!source.thumbnail) {
+        throw new Error('Failed to capture screen thumbnail');
+      }
+      
+      // Convert to buffer
+      const imageBuffer = source.thumbnail.toPNG();
+      
+      if (region) {
+        if (region.width < MIN_REGION_WIDTH || region.height < MIN_REGION_HEIGHT) {
+          return null;
+        }
+        
+        // Simple cropping without sharp - return original buffer for now
+        // TODO: Implement proper image cropping without sharp dependency
+        console.warn('Image cropping not available without sharp dependency');
+        return imageBuffer;
+      } else {
+        return imageBuffer;
+      }
+    } catch (error) {
+      console.error('❌ Screen capture error:', error);
+      
+      // Fallback to node-screenshots
+      try {
+        const { Window } = require('node-screenshots');
+        const best = this.getBestScanWindow();
+        if (best) {
+          const image = await best.captureImage();
+          if (region) {
+            if (region.width < MIN_REGION_WIDTH || region.height < MIN_REGION_HEIGHT) {
+              return null;
+            }
+            const cropped = await image.crop(region.x, region.y, region.width, region.height);
+            return await cropped.toPng();
+          } else {
+            return await image.toPng();
+          }
+        } else {
+          // Final fallback: screenshot-desktop
+          const screenshot = require('screenshot-desktop');
+          const imgBuffer = await screenshot();
+          if (region) {
+            if (region.width < MIN_REGION_WIDTH || region.height < MIN_REGION_HEIGHT) {
+              return null;
+            }
+            // Simple cropping without sharp - return original buffer for now
+            console.warn('Image cropping not available without sharp dependency');
+            return imgBuffer;
+          } else {
+            return imgBuffer;
+          }
+        }
+      } catch (fallbackError) {
+        console.error('❌ Fallback screen capture also failed:', fallbackError);
+        throw new Error('Screen capture failed on all methods');
+      }
+    }
+  }
+
+  // Background OCR removed - only scan when user requests it
+  // private startBackgroundScreenOCR() {
+  //   // This method is no longer used
+  // }
+
+  private async getFreshScreenText() {
+    try {
+      const { screenOCRService } = require('./services/ScreenOCRService');
+      const text = await screenOCRService.forceCapture();
+      this.latestScreenText = text;
+      this.latestScreenTimestamp = Date.now();
+      return text;
+    } catch (e) {
+      console.error('Error getting fresh screen text:', e);
+      return this.latestScreenText || '';
+    }
+  }
+
+  // Multi-window OCR: get text from all visible, non-minimized windows (excluding overlays)
+  private async getAllWindowsOCRText() {
+    const windows = require('node-screenshots').Window.all();
+    const skipPatterns = [/glasschat/i, /delo/i, /agentmarket/i, /^$/i];
+    const candidates = windows.filter(w => {
+      const title = (w.title || '').toLowerCase();
+      const app = (w.appName || '').toLowerCase();
+      return !w.isMinimized && !skipPatterns.some(p => p.test(title) || p.test(app));
+    });
+    let allText = '';
+    for (const win of candidates) {
+      try {
+        const image = await win.captureImage();
+        const preprocessed = await this.preprocessImageForOCR(await image.toPng());
+        const { data: { text } } = await Tesseract.recognize(preprocessed, 'eng');
+        if (text && text.trim().length > 0) {
+          allText += `\n[${win.title || win.appName}]:\n${text}\n`;
+        }
+      } catch (e) {
+        // Ignore errors for individual windows
+      }
+    }
+    return allText.trim();
+  }
+
+  // Helper: preprocess image buffer for OCR (simplified without sharp)
+  private async preprocessImageForOCR(imgBuffer: Buffer): Promise<Buffer> {
+    // Return original buffer - Tesseract can handle most image formats directly
+    return imgBuffer;
+  }
+
+  private getActiveWindowInfo() {
+    let appName = 'Unknown';
+    let windowTitle = 'Unknown';
+    if (process.platform === 'win32') {
+      const { execSync } = require('child_process');
+      try {
+        windowTitle = execSync('powershell -Command "(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -ne \"\" } | Sort-Object StartTime -Descending | Select-Object -First 1).MainWindowTitle"', { encoding: 'utf8' }).trim();
+        appName = execSync('powershell -Command "(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -ne \"\" } | Sort-Object StartTime -Descending | Select-Object -First 1).ProcessName"', { encoding: 'utf8' }).trim();
+      } catch (e) {}
+    } else if (process.platform === 'darwin') {
+      const { execSync } = require('child_process');
+      try {
+        const script = `tell application \"System Events\"\nset frontApp to name of first application process whose frontmost is true\nset frontWindow to name of first window of (first process whose frontmost is true)\nend tell\nreturn frontApp & \"|\" & frontWindow`;
+        const result = execSync(`osascript -e '${script}'`, { encoding: 'utf8' });
+        [appName, windowTitle] = result.trim().split('|');
+      } catch (e) {}
+    } else {
+      appName = process.title;
+      windowTitle = process.title;
+    }
+    return { appName, windowTitle };
+  }
+
+  private async processScreenContent(text: string) {
+    try {
+      const DELO_SYSTEM_PROMPT = `
+You are DELO, a friendly, helpful AI assistant who talks to the user like a smart, supportive friend.
+Be warm, conversational, and encouraging. Use natural, human language.
+If you suggest actions, explain them in a way that feels like you're personally helping the user.
+Always be positive and supportive, and make the user feel like they have a helpful companion.
+
+Analyze the screen content and provide:
+1. A friendly, conversational summary of what's visible
+2. 3-5 helpful suggestions for what the user might want to do next
+3. Focus only on the actual screen content, not UI elements or overlays
+
+Format your response as JSON:
+{
+  "summary": "friendly summary here",
+  "suggestions": ["suggestion 1", "suggestion 2", "suggestion 3"]
+}
+`;
+
+      const provider = process.env.LLM_PROVIDER || 'groq';
+      if (provider === 'openai') {
+        const openaiApiKey = process.env.OPENAI_API_KEY;
+        if (!openaiApiKey) {
+          return { summary: 'OpenAI API key not set.', suggestions: [] };
+        }
+        const client = new OpenAI({ apiKey: openaiApiKey });
+        const response = await client.chat.completions.create({
+          model: 'gpt-4.0',
+          messages: [
+            { role: 'system', content: DELO_SYSTEM_PROMPT },
+            { role: 'user', content: `Analyze this screen content: ${text}` }
+          ]
+        });
+        const result = response.choices?.[0]?.message?.content || '';
+        try {
+          const parsed = JSON.parse(result);
+          return { summary: parsed.summary, suggestions: parsed.suggestions || [] };
+        } catch {
+          return { summary: result, suggestions: [] };
+        }
+      } else {
+        // Use Groq API (OpenAI-compatible)
+        const apiKey = process.env.GROQ_API_KEY || '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';
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3-70b-8192',
+            messages: [
+              { role: 'system', content: DELO_SYSTEM_PROMPT },
+              { role: 'user', content: `Analyze this screen content: ${text}` }
+            ]
+          })
+        });
+        const data = await response.json();
+        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+          const result = data.choices[0].message.content;
+          try {
+            const parsed = JSON.parse(result);
+            return { summary: parsed.summary, suggestions: parsed.suggestions || [] };
+          } catch {
+            return { summary: result, suggestions: [] };
+          }
+        } else {
+          return { summary: 'No response from LLM.', suggestions: [] };
+        }
+      }
+    } catch (error) {
+      console.error('❌ Screen content processing error:', error);
+      return { 
+        summary: 'Sorry, I had trouble analyzing the screen content. Please try again!', 
+        suggestions: [] 
+      };
+>>>>>>> 9812c5b5c7957c5946b9049cedfc29d86f039d29
     }
   }
 }

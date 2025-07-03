@@ -26,6 +26,14 @@ export const DELOInterface: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (window.electronAPI) {
+      console.log('Renderer: window.electronAPI is available');
+    } else {
+      console.error('Renderer: window.electronAPI is NOT available');
+    }
+  }, []);
+
+  useEffect(() => {
     loadSuggestions();
     loadInsights();
     
@@ -128,21 +136,21 @@ export const DELOInterface: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
+    <div className="w-full max-w-2xl mx-auto p-6 glassmorphic bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-glow">
             <span className="text-white text-xl">🧠</span>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">DELO</h1>
-            <p className="text-sm text-gray-600">Intelligent Desktop Automation</p>
+            <h1 className="text-2xl font-bold text-white">DELO</h1>
+            <p className="text-sm text-white/70">Intelligent Desktop Automation</p>
           </div>
         </div>
         <button
           onClick={() => setShowInsights(!showInsights)}
-          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+          className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium text-white/80 transition-colors border border-white/20"
         >
           {showInsights ? 'Hide' : 'Show'} Insights
         </button>

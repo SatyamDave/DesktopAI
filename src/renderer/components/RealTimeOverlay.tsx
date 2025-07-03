@@ -264,251 +264,251 @@ const RealTimeOverlay: React.FC<RealTimeOverlayProps> = ({
       />
 
       {/* Main overlay */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ backdropFilter: 'blur(8px)' }}
-      >
-        {/* Overlay background */}
-        <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-
-        {/* Main content */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.3 }}
-          className="relative w-full max-w-2xl bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200/50">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2">
-                <Brain className="w-5 h-5 text-violet-600" />
-                <span className="font-semibold text-gray-800">AI Assistant</span>
-              </div>
-              
-              {/* Status indicators */}
-              <div className="flex items-center space-x-2 text-sm">
-                {systemStatus && (
-                  <>
-                    <div className={`flex items-center space-x-1 ${getStatusColor(systemStatus.cpu)}`}>
-                      <Monitor className="w-3 h-3" />
-                      <span>{systemStatus.cpu}%</span>
+      <AnimatePresence>
+        {isVisible && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className="fixed inset-0 z-50 pointer-events-auto"
+          >
+            {/* Glassmorphic main container */}
+            <div className="absolute top-0 left-0 right-0 w-full">
+              <div className="relative w-full">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 via-purple-400/20 to-blue-400/20 blur-xl" />
+                <div className="relative bg-white/10 backdrop-blur-xl border-b border-white/20 shadow-2xl rounded-2xl">
+                  {/* Header */}
+                  <div className="flex items-center justify-between p-4 border-b border-gray-200/50">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2">
+                        <Brain className="w-5 h-5 text-violet-600" />
+                        <span className="font-semibold text-gray-800">AI Assistant</span>
+                      </div>
+                      
+                      {/* Status indicators */}
+                      <div className="flex items-center space-x-2 text-sm">
+                        {systemStatus && (
+                          <>
+                            <div className={`flex items-center space-x-1 ${getStatusColor(systemStatus.cpu)}`}>
+                              <Monitor className="w-3 h-3" />
+                              <span>{systemStatus.cpu}%</span>
+                            </div>
+                            <div className={`flex items-center space-x-1 ${getStatusColor(systemStatus.memory)}`}>
+                              <Zap className="w-3 h-3" />
+                              <span>{systemStatus.memory}%</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className={`flex items-center space-x-1 ${getStatusColor(systemStatus.memory)}`}>
-                      <Zap className="w-3 h-3" />
-                      <span>{systemStatus.memory}%</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
 
-            <div className="flex items-center space-x-2">
-              {/* Auto mode toggle */}
-              <button
-                onClick={() => setAutoMode(!autoMode)}
-                className={`p-2 rounded-lg transition-colors ${
-                  autoMode 
-                    ? 'bg-green-100 text-green-600' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-                title={autoMode ? 'Auto mode enabled' : 'Auto mode disabled'}
-              >
-                <Play className="w-4 h-4" />
-              </button>
-
-              {/* Settings */}
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                title="Settings"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-
-              {/* Close */}
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                title="Close (Esc)"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Input area */}
-          <div className="p-4">
-            <div className="relative">
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleInputKeyDown}
-                placeholder="What would you like me to do? (Ctrl+K to focus, Ctrl+L for voice)"
-                className="w-full px-4 py-3 pr-12 bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
-                disabled={isProcessing}
-              />
-              
-              {/* Voice button */}
-              {onToggleListening && (
-                <button
-                  onClick={onToggleListening}
-                  className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-2 rounded-lg transition-colors ${
-                    isListening 
-                      ? 'bg-red-100 text-red-600 animate-pulse' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                  title={isListening ? 'Stop listening' : 'Start listening (Ctrl+L)'}
-                >
-                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                </button>
-              )}
-            </div>
-
-            {/* Quick actions */}
-            <div className="flex items-center space-x-2 mt-3">
-              <span className="text-sm text-gray-500">Quick:</span>
-              {['Open Chrome', 'Take screenshot', 'Search web', 'Write email'].map((action) => (
-                <button
-                  key={action}
-                  onClick={() => handleSubmit(action)}
-                  disabled={isProcessing}
-                  className="px-3 py-1 text-xs bg-violet-100 text-violet-700 rounded-full hover:bg-violet-200 transition-colors disabled:opacity-50"
-                >
-                  {action}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Results area */}
-          <AnimatePresence>
-            {lastResult && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="border-t border-gray-200/50"
-              >
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
-                      <span className={`text-sm font-medium ${getConfidenceColor(lastResult.confidence)}`}>
-                        {lastResult.intent}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {Math.round(lastResult.confidence * 100)}% confidence
-                      </span>
+                      {/* Auto mode toggle */}
+                      <button
+                        onClick={() => setAutoMode(!autoMode)}
+                        className={`p-2 rounded-lg transition-colors ${
+                          autoMode 
+                            ? 'bg-green-100 text-green-600' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                        title={autoMode ? 'Auto mode enabled' : 'Auto mode disabled'}
+                      >
+                        <Play className="w-4 h-4" />
+                      </button>
+
+                      {/* Settings */}
+                      <button
+                        onClick={() => setShowSettings(!showSettings)}
+                        className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                        title="Settings"
+                      >
+                        <Settings className="w-4 h-4" />
+                      </button>
+
+                      {/* Close */}
+                      <button
+                        onClick={onClose}
+                        className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                        title="Close (Esc)"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                    <div className="flex items-center space-x-1 text-xs text-gray-500">
-                      <Zap className="w-3 h-3" />
-                      <span>{lastResult.latency}ms</span>
+                  </div>
+
+                  {/* Input area */}
+                  <div className="p-4">
+                    <div className="relative">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={handleInputKeyDown}
+                        placeholder="What would you like me to do? (Ctrl+K to focus, Ctrl+L for voice)"
+                        className="w-full px-4 py-3 pr-12 bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                        disabled={isProcessing}
+                      />
+                      
+                      {/* Voice button */}
+                      {onToggleListening && (
+                        <button
+                          onClick={onToggleListening}
+                          className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-2 rounded-lg transition-colors ${
+                            isListening 
+                              ? 'bg-red-100 text-red-600 animate-pulse' 
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                          title={isListening ? 'Stop listening' : 'Start listening (Ctrl+L)'}
+                        >
+                          {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Quick actions */}
+                    <div className="flex items-center space-x-2 mt-3">
+                      <span className="text-sm text-gray-500">Quick:</span>
+                      {['Open Chrome', 'Take screenshot', 'Search web', 'Write email'].map((action) => (
+                        <button
+                          key={action}
+                          onClick={() => handleSubmit(action)}
+                          disabled={isProcessing}
+                          className="px-3 py-1 text-xs bg-violet-100 text-violet-700 rounded-full hover:bg-violet-200 transition-colors disabled:opacity-50"
+                        >
+                          {action}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  
-                  <div className={`p-3 rounded-lg ${
-                    lastResult.success 
-                      ? 'bg-green-50 border border-green-200' 
-                      : 'bg-red-50 border border-red-200'
-                  }`}>
-                    <p className="text-sm text-gray-700">{lastResult.response}</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
-          {/* Processing indicator */}
-          <AnimatePresence>
-            {isProcessing && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-violet-600" />
-                  <span className="text-gray-600">Processing command...</span>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+                  {/* Results area */}
+                  <AnimatePresence>
+                    {lastResult && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="border-t border-gray-200/50"
+                      >
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className={`text-sm font-medium ${getConfidenceColor(lastResult.confidence)}`}>
+                                {lastResult.intent}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {Math.round(lastResult.confidence * 100)}% confidence
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              <Zap className="w-3 h-3" />
+                              <span>{lastResult.latency}ms</span>
+                            </div>
+                          </div>
+                          
+                          <div className={`p-3 rounded-lg ${
+                            lastResult.success 
+                              ? 'bg-green-50 border border-green-200' 
+                              : 'bg-red-50 border border-red-200'
+                          }`}>
+                            <p className="text-sm text-gray-700">{lastResult.response}</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-        {/* Settings panel */}
-        <AnimatePresence>
-          {showSettings && (
-            <motion.div
-              initial={{ opacity: 0, x: 300 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 300 }}
-              className="absolute right-4 top-4 w-80 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/20 p-4"
-            >
-              <h3 className="font-semibold text-gray-800 mb-4">Settings</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Auto Mode
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={autoMode}
-                      onChange={(e) => setAutoMode(e.target.checked)}
-                      className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-                    />
-                    <span className="text-sm text-gray-600">
-                      Automatically execute commands without confirmation
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Voice Recognition
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={isListening}
-                      onChange={onToggleListening}
-                      className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-                    />
-                    <span className="text-sm text-gray-600">
-                      Enable voice commands
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Performance Mode
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={isUltraLightweight}
-                      className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-                      disabled
-                    />
-                    <span className="text-sm text-gray-600">
-                      Ultra-lightweight mode
-                    </span>
-                  </div>
+                  {/* Processing indicator */}
+                  <AnimatePresence>
+                    {isProcessing && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-violet-600" />
+                          <span className="text-gray-600">Processing command...</span>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+            </div>
+
+            {/* Settings panel */}
+            <AnimatePresence>
+              {showSettings && (
+                <motion.div
+                  initial={{ opacity: 0, x: 300 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 300 }}
+                  className="absolute right-4 top-4 w-80 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/20 p-4"
+                >
+                  <h3 className="font-semibold text-gray-800 mb-4">Settings</h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Auto Mode
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={autoMode}
+                          onChange={(e) => setAutoMode(e.target.checked)}
+                          className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                        />
+                        <span className="text-sm text-gray-600">
+                          Automatically execute commands without confirmation
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Voice Recognition
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={isListening}
+                          onChange={onToggleListening}
+                          className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                        />
+                        <span className="text-sm text-gray-600">
+                          Enable voice commands
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Performance Mode
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={isUltraLightweight}
+                          className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                          disabled
+                        />
+                        <span className="text-sm text-gray-600">
+                          Ultra-lightweight mode
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };

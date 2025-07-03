@@ -499,10 +499,11 @@ Always try to use the available functions to perform actions rather than just pr
         max_tokens: 1000
       };
 
-      // Use Azure OpenAI if configured, otherwise OpenAI
+      // Use Azure OpenAI if configured, otherwise OpenAI or OpenRouter
+      const openaiApiBase = process.env.OPENAI_API_BASE || 'https://api.openai.com/v1';
       const apiUrl = this.azureOpenaiEndpoint 
         ? `${this.azureOpenaiEndpoint}/openai/deployments/${this.azureOpenaiDeployment}/chat/completions?api-version=${this.azureOpenaiApiVersion || '2023-12-01-preview'}`
-        : 'https://api.openai.com/v1/chat/completions';
+        : `${openaiApiBase}/chat/completions`;
       
       const apiKey = this.azureOpenaiKey || this.openaiApiKey;
 

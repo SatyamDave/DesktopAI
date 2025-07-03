@@ -31,6 +31,7 @@ export class PerformanceOptimizer extends EventEmitter {
   private cpuUsageHistory: number[] = [];
 
   private constructor() {
+    console.log('PerformanceOptimizer: constructor called');
     super();
   }
 
