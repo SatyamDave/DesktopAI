@@ -3,10 +3,12 @@ import * as path from 'path';
 import * as child_process from 'child_process';
 import fetch from 'node-fetch';
 import OpenAI from 'openai';
+import { startStream } from '../audio/capturer';
 require('dotenv').config();
 
 // Import Friday core
 import { Friday } from './core/friday';
+import { runUserIntent } from './core/intentParser';
 const friday = new Friday();
 
 class GlassChatApp {
@@ -24,6 +26,7 @@ class GlassChatApp {
       this.createMainWindow();
       this.setupGlobalShortcuts();
       this.setupIPC();
+      this.startAudioPipeline();
     });
 
     app.on('window-all-closed', () => {
@@ -155,11 +158,8 @@ class GlassChatApp {
     ipcMain.handle('execute-command', async (event, command: string) => {
       try {
         console.log(`🎯 Executing command: "${command}"`);
-        return { 
-          success: true, 
-          result: `Command executed: ${command}`,
-          data: { type: 'command' }
-        };
+        const result = await runUserIntent(command);
+        return result;
       } catch (error) {
         console.error('❌ Command execution error:', error);
         return { success: false, error: (error as Error).message };
@@ -478,6 +478,28 @@ class GlassChatApp {
       return 'Could not summarize clipboard.';
     } catch (e) {
       return 'Error summarizing clipboard: ' + (e as Error).message;
+    }
+  }
+
+  private startAudioPipeline() {
+    // Start always-hearing audio pipeline and forward events to renderer
+    try {
+      startStream();
+      // Listen for transcript, wake, chat, suggestion events from capturer
+      const capturer = require('../audio/capturer');
+      // Listen for events on global (window) in Node
+      const eventTypes = ['transcript', 'wake', 'chat', 'suggestion'];
+      eventTypes.forEach(type => {
+        // Node.js doesn't have window, so use process or EventEmitter if needed
+        // Here, we patch capturer to emit events on process
+        process.on(type, (data) => {
+          if (this.mainWindow) {
+            this.mainWindow.webContents.send(type, data);
+          }
+        });
+      });
+    } catch (err) {
+      console.error('Error starting audio pipeline:', err);
     }
   }
 }

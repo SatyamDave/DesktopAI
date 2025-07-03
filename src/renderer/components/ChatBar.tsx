@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import DatabaseViewer from './DatabaseViewer';
 
 interface ChatBarProps {
   onClose: () => void;
@@ -8,7 +7,7 @@ interface ChatBarProps {
 
 const ChatBar: React.FC<ChatBarProps> = ({ onClose }) => {
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai' | 'system'; text: string }[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -17,6 +16,29 @@ const ChatBar: React.FC<ChatBarProps> = ({ onClose }) => {
   useEffect(() => {
     const inputEl = document.getElementById('chatbar-input') as HTMLInputElement;
     if (inputEl) inputEl.focus();
+  }, []);
+
+  useEffect(() => {
+    function onTranscript(e: CustomEvent<any>) {
+      const text = (e.detail && (e.detail.text || e.detail.message || e.detail)) || '';
+      setMessages((msgs: { role: 'user' | 'ai' | 'system'; text: string }[]) => [...msgs, { role: 'user', text }]);
+    }
+    function onSuggestion(e: CustomEvent<any>) {
+      const text = (e.detail && (e.detail.answer || e.detail.suggestion || e.detail.text || e.detail.message || e.detail)) || '';
+      setMessages((msgs: { role: 'user' | 'ai' | 'system'; text: string }[]) => [...msgs, { role: 'ai', text }]);
+    }
+    function onChat(e: CustomEvent<any>) {
+      const text = (e.detail && (e.detail.text || e.detail.message || e.detail)) || '';
+      setMessages((msgs: { role: 'user' | 'ai' | 'system'; text: string }[]) => [...msgs, { role: 'system', text }]);
+    }
+    window.addEventListener('transcript', onTranscript as EventListener);
+    window.addEventListener('suggestion', onSuggestion as EventListener);
+    window.addEventListener('chat', onChat as EventListener);
+    return () => {
+      window.removeEventListener('transcript', onTranscript as EventListener);
+      window.removeEventListener('suggestion', onSuggestion as EventListener);
+      window.removeEventListener('chat', onChat as EventListener);
+    };
   }, []);
 
   const handleSend = async () => {
@@ -92,8 +114,8 @@ const ChatBar: React.FC<ChatBarProps> = ({ onClose }) => {
       {/* Chat messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {messages.map((msg, idx) => (
-          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`rounded-lg px-4 py-2 max-w-[70%] ${msg.role === 'user' ? 'bg-violet-500 text-white' : 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-100'}`}>
+          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : msg.role === 'ai' ? 'justify-start' : 'justify-center'}`}>
+            <div className={`rounded-lg px-4 py-2 max-w-[70%] ${msg.role === 'user' ? 'bg-violet-500 text-white' : msg.role === 'ai' ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-100'}`}>
               {msg.text}
             </div>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, Settings, X, Play, RotateCcw, Zap, Brain, Monitor, MousePointer, Keyboard } from 'lucide-react';
+import { Mic, MicOff, Settings, X, Play, Zap, Brain, Monitor } from 'lucide-react';
 
 interface RealTimeOverlayProps {
   isVisible: boolean;
@@ -34,11 +34,11 @@ const RealTimeOverlay: React.FC<RealTimeOverlayProps> = ({
   isListening = false,
   onToggleListening,
   isUltraLightweight = false
-}) => {
+}: RealTimeOverlayProps) => {
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastResult, setLastResult] = useState<CommandResult | null>(null);
-  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [systemStatus] = useState<SystemStatus | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [autoMode, setAutoMode] = useState(false);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -207,6 +207,50 @@ const RealTimeOverlay: React.FC<RealTimeOverlayProps> = ({
     if (confidence > 0.6) return 'text-yellow-500';
     return 'text-red-500';
   };
+
+  useEffect(() => {
+    function onTranscript(e: CustomEvent<any>) {
+      const text = (e.detail && (e.detail.text || e.detail.message || e.detail)) || '';
+      setLastResult({
+        success: true,
+        intent: 'voice-transcript',
+        confidence: 1,
+        action: 'transcript',
+        response: text,
+        latency: 0
+      });
+    }
+    function onSuggestion(e: CustomEvent<any>) {
+      const text = (e.detail && (e.detail.answer || e.detail.suggestion || e.detail.text || e.detail.message || e.detail)) || '';
+      setLastResult({
+        success: true,
+        intent: 'suggestion',
+        confidence: 1,
+        action: 'suggestion',
+        response: text,
+        latency: 0
+      });
+    }
+    function onChat(e: CustomEvent<any>) {
+      const text = (e.detail && (e.detail.text || e.detail.message || e.detail)) || '';
+      setLastResult({
+        success: true,
+        intent: 'system',
+        confidence: 1,
+        action: 'system',
+        response: text,
+        latency: 0
+      });
+    }
+    window.addEventListener('transcript', onTranscript as EventListener);
+    window.addEventListener('suggestion', onSuggestion as EventListener);
+    window.addEventListener('chat', onChat as EventListener);
+    return () => {
+      window.removeEventListener('transcript', onTranscript as EventListener);
+      window.removeEventListener('suggestion', onSuggestion as EventListener);
+      window.removeEventListener('chat', onChat as EventListener);
+    };
+  }, []);
 
   if (!isVisible) return null;
 

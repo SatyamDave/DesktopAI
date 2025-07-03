@@ -1,0 +1,1 @@
+export const cfg = { wake: true, stt: 'whisper', vad: true, fallbackPTT: true, textWake: true }; 

@@ -2,7 +2,7 @@ import { CommandExecutor } from './CommandExecutor';
 import { configManager } from './ConfigManager';
 import { AIPlanner } from './AIPlanner';
 import { ClipboardManager } from './ClipboardManager';
-import { BehaviorTracker } from './BehaviorTracker';
+import { behaviorTracker } from './BehaviorTracker';
 import { AIProcessor } from './AIProcessor';
 import { WhisperMode } from './WhisperMode';
 import { commandExecutor } from './CommandExecutor';
@@ -32,7 +32,7 @@ export class AutomationTestSuite {
   private configManager: typeof configManager;
   private aiPlanner: AIPlanner;
   private clipboardManager: ClipboardManager;
-  private behaviorTracker: BehaviorTracker;
+  private behaviorTracker: typeof behaviorTracker;
   private aiProcessor: AIProcessor;
   private whisperMode: WhisperMode;
 
@@ -41,7 +41,7 @@ export class AutomationTestSuite {
     this.commandExecutor = commandExecutor;
     this.aiPlanner = new AIPlanner();
     this.clipboardManager = new ClipboardManager();
-    this.behaviorTracker = new BehaviorTracker();
+    this.behaviorTracker = behaviorTracker;
     this.aiProcessor = aiProcessor;
     this.whisperMode = new WhisperMode();
   }

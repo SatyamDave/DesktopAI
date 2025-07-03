@@ -1,7 +1,9 @@
 import fetch from 'node-fetch';
 import { OpenAI } from 'openai';
-import { registry } from './registry';
+import { registry, getAvailableTools, DiscoveredTool, executeTool } from './registry';
 import { Context, contextManager } from './context';
+import * as fs from 'fs';
+import * as path from 'path';
 require('dotenv').config();
 
 export interface IntentResult {
@@ -27,18 +29,24 @@ export class IntentParser {
     // 1. Try OpenRouter
     try {
       const openRouterResult = await this.tryOpenRouter(userText, context);
-      if (openRouterResult) return openRouterResult;
+      if (openRouterResult) {
+        // Always return the result - let the dynamic registry handle missing capabilities
+        return openRouterResult;
+      }
     } catch (error) {
       this.log('OpenRouter failed, falling back to Gemini:', error);
     }
     // 2. Try Gemini
     try {
       const geminiResult = await this.tryGemini(userText, context);
-      if (geminiResult) return geminiResult;
+      if (geminiResult) {
+        // Always return the result - let the dynamic registry handle missing capabilities
+        return geminiResult;
+      }
     } catch (error) {
       this.log('Gemini failed, falling back to fallbackIntentParsing:', error);
     }
-    // 3. Fallback
+    // 3. Fallback - be more aggressive about trying to match actions
     return this.fallbackIntentParsing(userText, context);
   }
 
@@ -154,175 +162,121 @@ export class IntentParser {
   }
 
   private buildSystemPrompt(context: Context): string {
-    const contextInfo = `
-Current Context:
-- Active Application: ${context.activeApp}
-- Window Title: ${context.windowTitle}
-- Clipboard Content: ${context.clipboardContent?.substring(0, 200) || ''}${context.clipboardContent && context.clipboardContent.length > 200 ? '...' : ''}
-- Recent Commands: ${context.recentCommands?.slice(-3).join(', ') || ''}
-- Screen Text: ${context.screenText?.substring(0, 100) || 'None'}${context.screenText && context.screenText.length > 100 ? '...' : ''}
-`;
-    return `You are Friday, an advanced AI assistant that can control the user's computer and perform various tasks.\n\n${contextInfo}\n\nCRITICAL INSTRUCTIONS:\n1. ALWAYS try to use the available functions to perform actions rather than just providing information\n2. If the user asks for something that can be done with a function, use the function\n3. Only provide conversational responses for general questions that don't require system actions\n4. Be precise with function arguments - extract the exact information the user wants\n5. If the user's request is ambiguous, ask for clarification or make reasonable assumptions\n6. When opening applications, prefer native apps over web versions unless specifically requested\n\nFUNCTION MAPPING GUIDE:\n- For opening applications: Use 'open_app' with appName parameter\n- For opening websites/URLs: Use 'open_url' with url parameter  \n- For web searches: Use 'open_url' with the search query as url parameter\n- For email composition: Use 'email_draft' with recipient, subject, and body parameters\n\nEXAMPLES:\n- \"open Chrome\" → open_app with appName: \"chrome\"\n- \"search for cats\" → open_url with url: \"cats\" (will be treated as search)\n- \"open google.com\" → open_url with url: \"https://google.com\"\n- \"email john@example.com\" → email_draft with recipient: \"john@example.com\"\n\nAvailable functions are provided below. Choose the most appropriate one based on the user's request.`;
+    const contextInfo = `Context: ${context.activeApp} | ${context.windowTitle?.substring(0, 50) || ''}`;
+
+    const availableFunctions = registry.getManifests();
+    const toolsJson = JSON.stringify(availableFunctions, null, 2);
+
+    return `You are DELO.FridayCore, an OS-level AI agent. Use available tools to automate tasks.
+
+${contextInfo}
+
+Available tools:
+${toolsJson}
+
+Examples:
+- "block calendar tomorrow 9-10pm" → create_event with title="Busy", start="tomorrow 21:00", end="tomorrow 22:00"
+- "open calculator" → open_app with appName="Calculator"
+- "search python tutorials" → open_url with url="python tutorials"
+
+Always use function calls for automation tasks.`;
   }
 
   private fallbackIntentParsing(userText: string, context: Context): IntentResult {
     const lowerText = userText.toLowerCase();
-
-    // Generalized app opening (for known apps)
-    if (lowerText.includes('open') && (
-      lowerText.includes('app') || 
-      lowerText.includes('application') || 
-      lowerText.includes('chrome') || 
-      lowerText.includes('firefox') || 
-      lowerText.includes('spotify') || 
-      lowerText.includes('vscode') || 
-      lowerText.includes('terminal') ||
-      lowerText.includes('notepad') ||
-      lowerText.includes('calculator') ||
-      lowerText.includes('finder') ||
-      lowerText.includes('explorer')
-    )) {
-      const appName = this.extractAppName(userText);
+    
+    // AGGRESSIVE pattern matching for common automation requests
+    if (lowerText.includes('calendar') || lowerText.includes('event') || lowerText.includes('meeting') || lowerText.includes('schedule')) {
+      return {
+        functionName: 'create_event',
+        arguments: { title: 'New Event', start: 'now', end: '1 hour from now' },
+        confidence: 0.8,
+        reasoning: 'Calendar event detected, attempting to create event.'
+      };
+    }
+    
+    if (lowerText.includes('email') || lowerText.includes('mail') || lowerText.includes('send')) {
+      return {
+        functionName: 'send_email',
+        arguments: { to: '', subject: '', body: '' },
+        confidence: 0.8,
+        reasoning: 'Email request detected, attempting to send email.'
+      };
+    }
+    
+    if (lowerText.includes('music') || lowerText.includes('play') || lowerText.includes('song') || lowerText.includes('spotify')) {
       return {
         functionName: 'open_app',
-        arguments: { appName },
+        arguments: { app: 'Music' },
         confidence: 0.8,
-        reasoning: 'Fallback: detected app opening request'
+        reasoning: 'Music request detected, attempting to open Music app.'
       };
     }
-
-    // Generalized URL opening: 'open X', 'open X on browser', etc.
-    if (lowerText.startsWith('open ')) {
-      const url = this.extractUrl(userText);
+    
+    if (lowerText.includes('note') || lowerText.includes('write') || lowerText.includes('text')) {
       return {
-        functionName: 'open_url',
-        arguments: { url },
+        functionName: 'create_note',
+        arguments: { title: 'New Note', content: '' },
         confidence: 0.8,
-        reasoning: 'Fallback: detected open URL or search request'
+        reasoning: 'Note creation detected, attempting to create note.'
       };
     }
-
-    // General search patterns
-    if (lowerText.includes('search') || lowerText.includes('find') || lowerText.includes('google') || lowerText.includes('look up')) {
-      const query = this.extractSearchQuery(userText);
+    
+    if (lowerText.includes('reminder') || lowerText.includes('todo') || lowerText.includes('task')) {
       return {
-        functionName: 'open_url',
-        arguments: { url: query },
+        functionName: 'create_reminder',
+        arguments: { title: 'New Reminder', dueDate: 'tomorrow' },
+        confidence: 0.8,
+        reasoning: 'Reminder request detected, attempting to create reminder.'
+      };
+    }
+    
+    if (lowerText.includes('file') || lowerText.includes('folder') || lowerText.includes('open')) {
+      return {
+        functionName: 'open_file',
+        arguments: { path: '' },
         confidence: 0.7,
-        reasoning: 'Fallback: detected search request'
+        reasoning: 'File operation detected, attempting to open file.'
       };
     }
-
-    // Email patterns - only if there's a valid email address
-    if ((lowerText.includes('email') || lowerText.includes('mail') || lowerText.includes('send email') || lowerText.includes('compose')) && 
-        (lowerText.includes('@') || lowerText.includes('.com') || lowerText.includes('.org') || lowerText.includes('.net'))) {
-      const emailInfo = this.extractEmailInfo(userText);
-      if (emailInfo.recipient) {
+    
+    // Check for available tools by name
+    const availableTools = registry.getManifests().map(f => f.name);
+    for (const tool of availableTools) {
+      if (lowerText.includes(tool.replace(/_/g, ' '))) {
         return {
-          functionName: 'email_draft',
-          arguments: emailInfo,
-          confidence: 0.6,
-          reasoning: 'Fallback: detected email request'
+          functionName: tool,
+          arguments: {},
+          confidence: 0.7,
+          reasoning: 'Matched tool by name in fallback.'
         };
       }
     }
-
+    
+    // If no specific pattern matches, try to infer the action and use fallback_request
+    if (lowerText.includes('app') || lowerText.includes('launch') || lowerText.includes('start')) {
+      return {
+        functionName: 'fallback_request',
+        arguments: {
+          reason: 'missing_app',
+          proposal: `I can help you install or set up the app you're looking for. What would you like to do?`,
+          details: { action: 'app_installation' }
+        },
+        confidence: 0.6,
+        reasoning: 'App launch request detected, offering installation help.'
+      };
+    }
+    
+    // Last resort: generic fallback_request
     return {
-      functionName: 'conversation',
-      arguments: { response: `I understand: "${userText}". How can I help you?` },
+      functionName: 'fallback_request',
+      arguments: {
+        reason: 'unknown_action',
+        proposal: `I can help you with this request. Would you like me to install the necessary app, set up automation, or guide you through the process?`,
+        details: { action: userText }
+      },
       confidence: 0.3,
-      reasoning: 'Fallback: no specific action detected'
-    };
-  }
-
-  private extractAppName(text: string): string {
-    const match = text.match(/open\s+(?:the\s+)?(?:app\s+)?(?:application\s+)?([a-zA-Z0-9\s]+)/i);
-    const appName = match ? match[1].trim() : 'unknown';
-    
-    // Map common app names to their system names
-    const appMappings: { [key: string]: string } = {
-      'notepad': 'notepad',
-      'chrome': 'chrome',
-      'firefox': 'firefox',
-      'spotify': 'spotify',
-      'vscode': 'vscode',
-      'terminal': 'terminal',
-      'calculator': 'calculator',
-      'finder': 'finder',
-      'explorer': 'explorer'
-    };
-    
-    const lowerAppName = appName.toLowerCase();
-    return appMappings[lowerAppName] || appName;
-  }
-
-  private extractSearchQuery(text: string): string {
-    // Handle various search patterns
-    const patterns = [
-      /(?:search\s+for|find|google|look up)\s+(.+)/i,
-      /(?:open|go to|visit)\s+(.+)/i,
-      /(.+)/i  // fallback to entire text
-    ];
-    
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match) {
-        const query = match[1].trim();
-        
-        // If it's a general search, use Google
-        return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-      }
-    }
-    
-    return text;
-  }
-
-  private extractUrl(text: string): string {
-    // Extract the main part after 'open'
-    let match = text.match(/open\s+(.+?)(?:\s+on\s+browser|\s+in\s+browser|$)/i);
-    let raw = match ? match[1].trim() : text.trim();
-
-    // Remove common trailing words
-    raw = raw.replace(/\s+(website|site|browser)$/i, '').trim();
-
-    // If it looks like a URL already, return as is
-    if (/^(https?:\/\/|www\.)/i.test(raw)) {
-      return raw.startsWith('http') ? raw : `https://${raw}`;
-    }
-    // If it looks like a domain (e.g. notion.so, chat.openai.com)
-    if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/i.test(raw)) {
-      return `https://${raw}`;
-    }
-
-    // Try common TLDs
-    const tlds = ['.com', '.ai', '.so', '.net', '.org', '.io', '.app'];
-    for (const tld of tlds) {
-      if (!raw.endsWith(tld)) {
-        const candidate = `https://${raw.replace(/\s+/g, '').toLowerCase()}${tld}`;
-        // Optionally: could check if domain exists, but for now just return first candidate
-        return candidate;
-      }
-    }
-
-    // Fallback: treat as a Google search
-    return `https://www.google.com/search?q=${encodeURIComponent(raw)}`;
-  }
-
-  private extractEmailInfo(text: string): any {
-    const emailMatch = text.match(/(?:email|mail|send to)\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
-    const recipient = emailMatch ? emailMatch[1] : '';
-    
-    const subjectMatch = text.match(/(?:subject|about)\s+(.+?)(?:\s+body|\s+content|$)/i);
-    const subject = subjectMatch ? subjectMatch[1].trim() : '';
-    
-    const bodyMatch = text.match(/(?:body|content|message)\s+(.+)/i);
-    const body = bodyMatch ? bodyMatch[1].trim() : '';
-    
-    return {
-      recipient,
-      subject,
-      body,
-      useClipboard: true
+      reasoning: 'No specific pattern matched, offering general assistance.'
     };
   }
 
@@ -333,4 +287,106 @@ Current Context:
   }
 }
 
-export const intentParser = new IntentParser(); 
+export const intentParser = new IntentParser();
+
+export async function matchIntentToTool(userInput: string): Promise<DiscoveredTool | undefined> {
+  const tools = await getAvailableTools();
+  const input = userInput.toLowerCase();
+  return tools.find(tool =>
+    tool.name.toLowerCase().includes(input) ||
+    tool.description.toLowerCase().includes(input)
+  );
+}
+
+// Use OpenRouter API to generate AppleScript for the user input
+async function generateScriptWithLLM(userInput: string): Promise<{ success: boolean; script: string; error?: string }> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return { success: false, script: '', error: 'OpenRouter API key not set.' };
+  }
+  const prompt = `You are an expert AppleScript developer. Write a complete AppleScript that accomplishes the following user request on macOS. Only output the script, no explanation.\n\nUser request: ${userInput}`;
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4',
+        messages: [
+          { role: 'system', content: 'You are an expert AppleScript developer.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 512,
+        temperature: 0.2
+      })
+    });
+    if (!response.ok) {
+      return { success: false, script: '', error: `OpenRouter API error: ${response.statusText}` };
+    }
+    const data = await response.json();
+    const script = data.choices?.[0]?.message?.content?.trim();
+    if (!script) {
+      return { success: false, script: '', error: 'No script returned from OpenRouter.' };
+    }
+    return { success: true, script };
+  } catch (error: any) {
+    return { success: false, script: '', error: error.message || 'OpenRouter API call failed.' };
+  }
+}
+
+// Test the generated AppleScript by running it
+async function testAppleScript(script: string): Promise<boolean> {
+  const { exec } = await import('child_process');
+  const { promisify } = await import('util');
+  const execAsync = promisify(exec);
+  try {
+    await execAsync(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Save the script to plugins/generated/ and return the tool metadata
+async function saveGeneratedScript(userInput: string, script: string): Promise<import('./registry').DiscoveredTool> {
+  const safeName = userInput.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
+  const dir = path.resolve(__dirname, '../../../plugins/generated');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const filePath = path.join(dir, `${safeName}.applescript`);
+  fs.writeFileSync(filePath, script, 'utf8');
+  return {
+    name: safeName,
+    description: `Generated AppleScript for: ${userInput}`,
+    type: 'applescript',
+    command: filePath,
+  };
+}
+
+export type RunUserIntentResult = Promise<{
+  success: boolean;
+  output: string;
+  error?: string;
+}>;
+
+export async function runUserIntent(userInput: string): Promise<{ success: boolean; output: string; error?: string }> {
+  const tool = await matchIntentToTool(userInput);
+  if (tool) {
+    return executeTool(tool);
+  }
+  // LLM fallback: try to generate a script
+  const llmResult = await generateScriptWithLLM(userInput);
+  if (!llmResult.success) {
+    return { success: false, output: '', error: 'No matching tool found, and script generation failed.' };
+  }
+  // Test the generated script
+  const testPassed = await testAppleScript(llmResult.script);
+  if (!testPassed) {
+    return { success: false, output: '', error: 'Generated script did not work.' };
+  }
+  // Save and register the new tool
+  const newTool = await saveGeneratedScript(userInput, llmResult.script);
+  // Optionally: hot-reload registry here if needed
+  return executeTool(newTool);
+} 

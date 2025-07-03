@@ -15,7 +15,7 @@ import { AppLaunchService } from './AppLaunchService';
 import natural from 'natural';
 import { EnhancedAIPromptingService } from './EnhancedAIPromptingService';
 import { WorkflowManager } from './WorkflowManager';
-import { VoiceControlService } from './VoiceControlService';
+import { voiceControlService } from './VoiceControlService';
 import { PatternDetectionService } from './PatternDetectionService';
 import { RealTimeAudioService } from './RealTimeAudioService';
 import { RealTimeVisualService } from './RealTimeVisualService';
@@ -98,7 +98,6 @@ export class DELOCommandSystem extends EventEmitter {
   };
   private confidenceThreshold = 0.7;
   private workflowManager: WorkflowManager | null;
-  private voiceControl: VoiceControlService | null;
   private patternDetection: PatternDetectionService | null;
   private audioService: RealTimeAudioService | null;
   private visualService: RealTimeVisualService | null;
@@ -128,7 +127,6 @@ export class DELOCommandSystem extends EventEmitter {
     this.appLaunch = null;
     this.enhancedAI = null;
     this.workflowManager = null;
-    this.voiceControl = null;
     this.patternDetection = null;
     this.audioService = null;
     this.visualService = null;
@@ -147,7 +145,6 @@ export class DELOCommandSystem extends EventEmitter {
         this.ensureSessionMemoryManagerInitialized(),
         this.ensureLocalLLMInitialized(),
         this.ensureWorkflowManagerInitialized(),
-        this.ensureVoiceControlInitialized(),
         this.ensurePatternDetectionInitialized(),
         this.ensureSensoryIntelligenceInitialized()
       ]);
@@ -226,15 +223,6 @@ export class DELOCommandSystem extends EventEmitter {
       console.log('⚙️ Initializing WorkflowManager...');
       this.workflowManager = new WorkflowManager(this);
       await this.workflowManager.initialize();
-    }
-  }
-
-  private async ensureVoiceControlInitialized(): Promise<void> {
-    if (!this.voiceControl) {
-      console.log('🎤 Initializing VoiceControlService...');
-      await this.ensureWorkflowManagerInitialized();
-      this.voiceControl = new VoiceControlService(this, this.workflowManager!);
-      await this.voiceControl.initialize();
     }
   }
 
@@ -652,9 +640,9 @@ export class DELOCommandSystem extends EventEmitter {
    * Start voice control
    */
   public async startVoiceControl(): Promise<void> {
-    if (this.voiceControl) {
+    if (voiceControlService) {
       try {
-        await this.voiceControl.startListening();
+        await voiceControlService.startListening();
       } catch (error) {
         console.error('Error starting voice control:', error);
         throw error;
@@ -668,9 +656,9 @@ export class DELOCommandSystem extends EventEmitter {
    * Stop voice control
    */
   public async stopVoiceControl(): Promise<void> {
-    if (this.voiceControl) {
+    if (voiceControlService) {
       try {
-        await this.voiceControl.stopListening();
+        await voiceControlService.stopListening();
       } catch (error) {
         console.error('Error stopping voice control:', error);
         throw error;
@@ -734,8 +722,8 @@ export class DELOCommandSystem extends EventEmitter {
    * Get voice control state
    */
   public getVoiceState(): any {
-    if (this.voiceControl) {
-      return this.voiceControl.getState();
+    if (voiceControlService) {
+      return voiceControlService.getState();
     }
     return null;
   }
@@ -744,8 +732,8 @@ export class DELOCommandSystem extends EventEmitter {
    * Get voice configuration
    */
   public getVoiceConfig(): any {
-    if (this.voiceControl) {
-      return this.voiceControl.getConfig();
+    if (voiceControlService) {
+      return voiceControlService.getConfig();
     }
     return null;
   }
@@ -754,8 +742,8 @@ export class DELOCommandSystem extends EventEmitter {
    * Update voice configuration
    */
   public updateVoiceConfig(config: any): void {
-    if (this.voiceControl) {
-      this.voiceControl.updateConfig(config);
+    if (voiceControlService) {
+      voiceControlService.updateConfig(config);
     }
   }
 

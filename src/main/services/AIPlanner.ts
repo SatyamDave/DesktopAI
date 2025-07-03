@@ -1,5 +1,6 @@
 import { agenticCommandProcessor } from './AgenticCommandProcessor';
 import { configManager } from './ConfigManager';
+import { runUserIntent } from '../core/intentParser';
 
 interface ActionStep {
   id: string;
@@ -19,9 +20,15 @@ interface PlanningResult {
   fallback?: string;
 }
 
+interface PlanStep {
+  description: string;
+  command: string;
+}
+
 export class AIPlanner {
   private agenticCommandProcessor: typeof agenticCommandProcessor;
   private configManager: typeof configManager;
+  private partialResults: any[] = [];
 
   constructor() {
     this.agenticCommandProcessor = agenticCommandProcessor;
@@ -211,7 +218,32 @@ export class AIPlanner {
     
     return Math.min(confidence, 1.0);
   }
+
+  // Plan and execute a multistep task
+  async planAndExecute(userInput: string): Promise<{ success: boolean; results: any[]; error?: string }> {
+    // TODO: Use LLM/ReAct to break down the userInput into steps
+    // Placeholder: treat the whole input as a single step
+    const steps: PlanStep[] = [
+      { description: 'Single-step plan', command: userInput }
+    ];
+    this.partialResults = [];
+    for (const step of steps) {
+      const result = await runUserIntent(step.command);
+      this.partialResults.push({ step: step.description, result });
+      if (!result.success) {
+        return { success: false, results: this.partialResults, error: result.error };
+      }
+    }
+    return { success: true, results: this.partialResults };
+  }
+
+  // Get memory of partial results
+  getPartialResults() {
+    return this.partialResults;
+  }
 }
+
+export const aiPlanner = new AIPlanner();
 
 // Legacy function for backward compatibility
 export async function planActions(command: string): Promise<string[]> {

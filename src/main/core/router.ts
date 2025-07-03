@@ -1,6 +1,8 @@
 import { registry } from './registry';
 import { contextManager } from './context';
 import { IntentResult } from './intentParser';
+import { DynamicRegistry } from '../runtime/registry';
+import { AIProcessor } from '../services/AIProcessor';
 
 export interface RouterResult {
   success: boolean;
@@ -14,9 +16,13 @@ export interface RouterResult {
 
 export class Router {
   private debug: boolean;
+  private dynamicRegistry: DynamicRegistry;
+  private aiProcessor: AIProcessor;
 
   constructor() {
     this.debug = process.env.DEBUG_MODE === 'true';
+    this.aiProcessor = new AIProcessor();
+    this.dynamicRegistry = new DynamicRegistry(this.aiProcessor);
   }
 
   public async dispatch(intent: IntentResult): Promise<RouterResult> {
@@ -41,13 +47,61 @@ export class Router {
       // Add command to context history
       contextManager.addCommand(`${intent.functionName} ${JSON.stringify(intent.arguments)}`);
 
-      // Check if plugin exists
-      const plugin = registry.getPlugin(intent.functionName);
+      // Check if plugin exists in static registry
+      let plugin = registry.getPlugin(intent.functionName);
+      
+      // If not found in static registry, try dynamic registry
       if (!plugin) {
+        this.log(`Plugin '${intent.functionName}' not found in static registry, trying dynamic registry...`);
+        
+        // Initialize dynamic registry if needed
+        await this.dynamicRegistry.initialize();
+        
+        // Check if tool exists in dynamic registry
+        const dynamicTools = this.dynamicRegistry.getFunctionDeclarations();
+        const dynamicTool = dynamicTools.find(t => t.name === intent.functionName);
+        
+        if (dynamicTool) {
+          this.log(`Found '${intent.functionName}' in dynamic registry, executing...`);
+          
+          // Execute using dynamic registry
+          const executionContext = {
+            platform: process.platform,
+            frontApp: context.activeApp,
+            clipboard: context.clipboardContent,
+            screenText: context.screenText,
+            userRequest: intent.functionName
+          };
+          
+          const result = await this.dynamicRegistry.run(intent.functionName, intent.arguments, executionContext);
+          
+          const executionTime = Date.now() - startTime;
+          
+          if (result.success) {
+            return {
+              success: true,
+              message: result.output || `Successfully executed ${intent.functionName}`,
+              data: result,
+              pluginName: intent.functionName,
+              executionTime,
+              requiresConfirmation: false
+            };
+          } else {
+            return {
+              success: false,
+              message: result.error || `Failed to execute ${intent.functionName}`,
+              error: result.error || 'DYNAMIC_EXECUTION_FAILED',
+              pluginName: intent.functionName,
+              executionTime
+            };
+          }
+        }
+        
+        // If still not found, return fallback_request
         return {
           success: false,
-          message: `Plugin '${intent.functionName}' not found`,
-          error: 'PLUGIN_NOT_FOUND',
+          message: `Capability '${intent.functionName}' not available. Would you like me to help you install or set up what you need?`,
+          error: 'CAPABILITY_NOT_FOUND',
           executionTime: Date.now() - startTime
         };
       }

@@ -13,7 +13,9 @@
     "postinstall": "electron-builder install-app-deps",
     "type-check": "tsc --noEmit",
     "lint": "echo 'No linter configured yet'",
-    "build:plugins": "tsc --project tsconfig.plugins.json"
+    "build:plugins": "tsc --project tsconfig.plugins.json",
+    "build:workers": "tsc --project tsconfig.json",
+    "postbuild:workers": "cp dist/audio/audio/*.js dist/audio/ && cp src/audio/transcriptStore.js dist/audio/"
   },
   "keywords": [
     "ai",
@@ -25,17 +27,20 @@
   "author": "Doppel Team",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@types/react": "^18.2.45",
-    "@types/react-dom": "^18.2.18",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.19.4",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.2.1",
     "concurrently": "^8.2.2",
     "electron": "^27.1.3",
     "electron-builder": "^24.6.4",
-    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
     "vite": "^5.0.8"
   },
   "dependencies": {
+    "@picovoice/porcupine-node": "^3.0.6",
     "@tailwindcss/forms": "^0.5.7",
     "@whiskeysockets/baileys": "^6.7.18",
     "autoprefixer": "^10.4.16",
@@ -65,14 +70,16 @@
     "ora": "^7.0.1",
     "postcss": "^8.4.32",
     "ps-list": "^8.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "puppeteer": "^24.11.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-router-dom": "^6.20.1",
     "screenshot-desktop": "^1.12.7",
     "sql.js": "^1.9.0",
     "systeminformation": "^5.21.23",
     "tailwindcss": "^3.3.6",
     "tesseract.js": "^6.0.1",
+    "wav": "^1.0.2",
     "ws": "^8.14.2"
   },
   "build": {

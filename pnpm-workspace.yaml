@@ -1,0 +1,7 @@
+ignoredBuiltDependencies:
+  - '@whiskeysockets/baileys'
+  - electron
+  - esbuild
+  - protobufjs
+  - puppeteer
+  - tesseract.js

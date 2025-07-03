@@ -1,0 +1,70 @@
+name: create_event
+kind: api
+parameters:
+  type: object
+  properties:
+    title: { type: string }
+    start: { type: string, format: datetime }
+    end: { type: string, format: datetime }
+    location: { type: string }
+    description: { type: string }
+    guests: { type: array, items: {type:string}, default: [] }
+  required: [title, start, end]
+description: "Create a calendar event in any connected calendar"
+scopes: [ https://www.googleapis.com/auth/calendar.events ]
+---
+name: create_event_script
+kind: script
+description: "Create a calendar event using AppleScript (macOS)"
+parameters:
+  type: object
+  properties:
+    title: { type: string }
+    start: { type: string }
+    end: { type: string }
+    location: { type: string }
+    description: { type: string }
+    guests: { type: array, items: {type:string}, default: [] }
+  required: [title, start, end]
+---
+name: create_event_cli
+kind: cli
+description: "Create a calendar event using CLI (macOS)"
+parameters:
+  type: object
+  properties:
+    title: { type: string }
+    start: { type: string }
+    end: { type: string }
+    location: { type: string }
+    description: { type: string }
+    guests: { type: array, items: {type:string}, default: [] }
+  required: [title, start, end]
+---
+name: create_event_uia
+kind: uia
+description: "Create a calendar event using UI automation (macOS)"
+parameters:
+  type: object
+  properties:
+    title: { type: string }
+    start: { type: string }
+    end: { type: string }
+    location: { type: string }
+    description: { type: string }
+    guests: { type: array, items: {type:string}, default: [] }
+  required: [title, start, end]
+---
+name: create_event_vision
+kind: vision-fallback
+description: "Create a calendar event using vision+LLM fallback (macOS)"
+parameters:
+  type: object
+  properties:
+    title: { type: string }
+    start: { type: string }
+    end: { type: string }
+    location: { type: string }
+    description: { type: string }
+    guests: { type: array, items: {type:string}, default: [] }
+  required: [title, start, end] 

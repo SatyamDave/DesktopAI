@@ -44,4 +44,12 @@ contextBridge.exposeInMainWorld('friday', {
   // Status
   getStatus: () => 
     ipcRenderer.invoke('friday-get-status'),
+});
+
+// Forward audio events from main process to renderer window
+const audioEventTypes = ['transcript', 'wake', 'chat', 'suggestion'];
+audioEventTypes.forEach(type => {
+  ipcRenderer.on(type, (_event, data) => {
+    window.dispatchEvent(new CustomEvent(type, { detail: data }));
+  });
 }); 

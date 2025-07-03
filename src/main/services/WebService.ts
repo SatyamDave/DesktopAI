@@ -1,4 +1,6 @@
 import { shell } from 'electron';
+import fetch from 'node-fetch';
+import * as crypto from 'crypto';
 
 // Allow commonjs require in this file (used for optional Puppeteer dependency)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -14,12 +16,23 @@ puppeteer = (() => {
   try { return require('puppeteer'); } catch { return null; }
 })();
 
+// Supported providers
+const PROVIDERS = ['google', 'microsoft', 'youtube', 'spotify'] as const;
+type Provider = typeof PROVIDERS[number];
+
+interface TokenData {
+  access_token: string;
+  refresh_token?: string;
+  expires_at?: number;
+}
+
 /**
  * A lightweight helper focused on common web-centric automations that the assistant needs.
  * Right now it only knows how to deal with YouTube searches but can be expanded easily.
  */
 export class WebService {
   private browser: any = null;
+  private tokenStore: Map<Provider, TokenData> = new Map();
 
   /**
    * Opens a YouTube search for the provided query. If `autoPlay` is true and Puppeteer
@@ -63,6 +76,57 @@ export class WebService {
     if (this.browser) {
       await this.browser.close();
       this.browser = null;
+    }
+  }
+
+  // Step 1: Get OAuth URL for user to authenticate
+  getAuthUrl(provider: Provider): string {
+    switch (provider) {
+      case 'google':
+        return 'https://accounts.google.com/o/oauth2/v2/auth?...'; // TODO: Fill in client_id, redirect_uri, scopes
+      case 'microsoft':
+        return 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize?...';
+      case 'youtube':
+        return 'https://accounts.google.com/o/oauth2/v2/auth?...'; // YouTube uses Google OAuth
+      case 'spotify':
+        return 'https://accounts.spotify.com/authorize?...';
+      default:
+        throw new Error('Unsupported provider');
+    }
+  }
+
+  // Step 2: Handle OAuth callback and exchange code for tokens
+  async handleAuthCallback(provider: Provider, code: string): Promise<TokenData> {
+    // TODO: Implement provider-specific token exchange
+    // Placeholder: return dummy token
+    const token: TokenData = {
+      access_token: crypto.randomBytes(32).toString('hex'),
+      refresh_token: crypto.randomBytes(32).toString('hex'),
+      expires_at: Date.now() + 3600 * 1000,
+    };
+    this.tokenStore.set(provider, token);
+    return token;
+  }
+
+  // Step 3: Get access token (refresh if expired)
+  async getAccessToken(provider: Provider): Promise<string> {
+    const token = this.tokenStore.get(provider);
+    if (!token) throw new Error('No token for provider');
+    if (token.expires_at && token.expires_at < Date.now()) {
+      await this.refreshToken(provider);
+      return this.tokenStore.get(provider)!.access_token;
+    }
+    return token.access_token;
+  }
+
+  // Step 4: Refresh token
+  async refreshToken(provider: Provider): Promise<void> {
+    // TODO: Implement provider-specific refresh logic
+    // Placeholder: extend expiry
+    const token = this.tokenStore.get(provider);
+    if (token) {
+      token.expires_at = Date.now() + 3600 * 1000;
+      this.tokenStore.set(provider, token);
     }
   }
 }

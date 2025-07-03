@@ -18,7 +18,7 @@ import { ScreenOCRService } from './ScreenOCRService';
 import { ActiveWindowService } from './ActiveWindowService';
 import { EmailService } from './EmailService';
 import { AppLaunchService } from './AppLaunchService';
-import { VoiceControlService } from './VoiceControlService';
+import { voiceControlService } from './VoiceControlService';
 import { SensoryIntelligenceService } from './SensoryIntelligenceService';
 import { RealTimeAudioService } from './RealTimeAudioService';
 import { RealTimeVisualService } from './RealTimeVisualService';
@@ -72,7 +72,6 @@ export class JarvisAI extends EventEmitter {
   private activeWindow: ActiveWindowService | null = null;
   private emailService: EmailService | null = null;
   private appLaunch: AppLaunchService | null = null;
-  private voiceControl: VoiceControlService | null = null;
   private sensoryIntelligence: SensoryIntelligenceService | null = null;
   private audioService: RealTimeAudioService | null = null;
   private visualService: RealTimeVisualService | null = null;
@@ -414,7 +413,6 @@ export class JarvisAI extends EventEmitter {
       this.workflowManager = new WorkflowManager(this.deloSystem);
       this.audioService = new RealTimeAudioService(this.deloSystem);
       this.visualService = new RealTimeVisualService(this.deloSystem);
-      this.voiceControl = new VoiceControlService(this.deloSystem, this.workflowManager);
       this.sensoryIntelligence = new SensoryIntelligenceService(this.deloSystem, this.audioService, this.visualService);
       
       console.log('✅ Optional services initialized');
@@ -1025,19 +1023,19 @@ Please provide a helpful response. If this is a command that should trigger an a
 
   // Public methods for external access
   public async startVoiceControl(): Promise<void> {
-    if (this.voiceControl) {
-      await this.voiceControl.startListening();
+    if (voiceControlService) {
+      await voiceControlService.startListening();
     }
   }
 
   public async stopVoiceControl(): Promise<void> {
-    if (this.voiceControl) {
-      await this.voiceControl.stopListening();
+    if (voiceControlService) {
+      await voiceControlService.stopListening();
     }
   }
 
   public getVoiceState(): any {
-    return this.voiceControl?.getState() || { isActive: false };
+    return voiceControlService?.getState() || { isActive: false };
   }
 
   public async getSuggestions(context: JarvisContext): Promise<string[]> {

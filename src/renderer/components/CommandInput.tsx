@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mic, Keyboard, Search, Sparkles, History, Zap } from 'lucide-react';
+import { X, Mic, Search, Sparkles, History, Zap } from 'lucide-react';
 
 interface CommandInputProps {
   onClose: () => void;

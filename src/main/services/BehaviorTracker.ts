@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { DatabaseManager } from './DatabaseManager';
 import { PerformanceOptimizer } from './PerformanceOptimizer';
+import { EventEmitter } from 'events';
 
 interface BehaviorEvent {
   id: number;
@@ -26,7 +27,7 @@ interface TimeBasedStats {
   activeTime: number;
 }
 
-export class BehaviorTracker {
+class BehaviorTracker extends EventEmitter {
   private databaseManager: DatabaseManager;
   private performanceOptimizer: PerformanceOptimizer;
   private isTracking = false;
@@ -35,8 +36,13 @@ export class BehaviorTracker {
   private lastEventTime = 0;
   private trackingInterval: NodeJS.Timeout | null = null;
   private dbName = 'behavior';
+  private clipboardLast: string = '';
+  private calendarInterval: NodeJS.Timeout | null = null;
+  private inboxInterval: NodeJS.Timeout | null = null;
+  private clipboardInterval: NodeJS.Timeout | null = null;
 
   constructor() {
+    super();
     this.databaseManager = DatabaseManager.getInstance();
     this.performanceOptimizer = PerformanceOptimizer.getInstance();
     
@@ -361,4 +367,48 @@ export class BehaviorTracker {
       lastEventTime: this.lastEventTime
     };
   }
-} 
+
+  // Start watching calendar events (stub)
+  startCalendarWatcher() {
+    if (this.calendarInterval) return;
+    this.calendarInterval = setInterval(() => {
+      // TODO: Check for upcoming events
+      this.emit('calendar', { event: 'meeting_soon', details: { title: 'Sample Meeting', time: Date.now() + 10 * 60 * 1000 } });
+    }, 60 * 1000); // every minute
+  }
+
+  // Start watching inbox (stub)
+  startInboxWatcher() {
+    if (this.inboxInterval) return;
+    this.inboxInterval = setInterval(() => {
+      // TODO: Check for new emails
+      this.emit('inbox', { event: 'new_email', details: { from: 'alice@example.com', subject: 'Hello!' } });
+    }, 60 * 1000); // every minute
+  }
+
+  // Start watching clipboard (stub)
+  startClipboardWatcher() {
+    if (this.clipboardInterval) return;
+    this.clipboardInterval = setInterval(() => {
+      // TODO: Use Electron clipboard API in main process
+      // For now, simulate clipboard change
+      const newClip = Math.random().toString(36).slice(2, 8);
+      if (newClip !== this.clipboardLast) {
+        this.clipboardLast = newClip;
+        this.emit('clipboard', { event: 'clipboard_change', details: { content: newClip } });
+      }
+    }, 5000); // every 5 seconds
+  }
+
+  // Register a callback for suggestions
+  onSuggestion(cb: (suggestion: { type: string; details: any }) => void) {
+    this.on('suggestion', cb);
+  }
+
+  // Emit a suggestion (for rule engine/LLM)
+  suggest(type: string, details: any) {
+    this.emit('suggestion', { type, details });
+  }
+}
+
+export const behaviorTracker = new BehaviorTracker(); 

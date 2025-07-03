@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ipcRenderer } from 'electron';
 
 interface DeloCommandResult {
   success: boolean;
