@@ -27,6 +27,14 @@ export const DELOInterface: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (window.electronAPI) {
+      console.log('Renderer: window.electronAPI is available');
+    } else {
+      console.error('Renderer: window.electronAPI is NOT available');
+    }
+  }, []);
+
+  useEffect(() => {
     loadSuggestions();
     loadInsights();
     

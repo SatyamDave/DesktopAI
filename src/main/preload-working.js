@@ -1,5 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+console.log('✅ Preload script loaded: window.electronAPI will be exposed');
+
 // REMOVE: // Simplified API for the basic orb functionality
 
 // Basic system info
@@ -16,6 +18,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Basic system info
   getAppStatus: () => ipcRenderer.invoke('get-app-status'),
+  
+  getDeloSuggestions: () => ipcRenderer.invoke('getDeloSuggestions'),
+
+  // DELO command system
+  processDeloCommand: (command) => ipcRenderer.invoke('process-delo-command', { command }),
+  getDeloInsights: () => ipcRenderer.invoke('getDeloInsights'),
+  getDeloScreenSummary: (region) => ipcRenderer.invoke('getDeloScreenSummary', region),
+
+  // Overlay control
+  hideDeloOverlay: () => ipcRenderer.invoke('hide-delo-overlay'),
+  showDeloOverlay: () => ipcRenderer.invoke('show-delo-overlay'),
+
+  // Screen capture and analysis
+  captureScreenRegion: (region) => ipcRenderer.invoke('capture-screen-region', region),
+  captureFullScreen: () => ipcRenderer.invoke('capture-full-screen'),
+  readScreenText: () => ipcRenderer.invoke('read-screen-text'),
 });
 
 // Expose Friday API to renderer process

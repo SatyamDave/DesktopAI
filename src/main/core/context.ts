@@ -40,7 +40,7 @@ export class ContextManager {
     this.debug = process.env.DEBUG_MODE === 'true';
   }
 
-  public async getCurrentContext(): Promise<Context> {
+  public async getCurrentContext(options?: { skipScreenText?: boolean }): Promise<Context> {
     try {
       const [
         activeApp,
@@ -53,7 +53,7 @@ export class ContextManager {
         this.getActiveApp(),
         this.getActiveWindowTitle(),
         this.getClipboardContent(),
-        this.getScreenText(),
+        options && options.skipScreenText ? Promise.resolve(undefined) : this.getScreenText(),
         this.getSystemInfo(),
         this.getUserInfo()
       ]);

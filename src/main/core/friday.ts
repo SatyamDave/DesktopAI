@@ -47,10 +47,8 @@ export class Friday extends EventEmitter {
       this.log('🚀 Initializing Friday AI Assistant...');
       
       // Initialize core components
-      await Promise.all([
-        registry.initialize(),
-        contextManager.getCurrentContext() // Warm up context
-      ]);
+      await registry.initialize();
+      await contextManager.getCurrentContext({ skipScreenText: true }); // Warm up context without OCR
 
       this.isInitialized = true;
       this.log('✅ Friday AI Assistant initialized successfully');

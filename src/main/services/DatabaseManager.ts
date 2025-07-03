@@ -46,6 +46,7 @@ export class DatabaseManager {
   private batchQueues = new Map<string, BatchOperation[]>();
 
   private constructor() {
+    console.log('DatabaseManager: constructor called');
     this.performanceOptimizer = PerformanceOptimizer.getInstance();
   }
 
@@ -116,6 +117,8 @@ export class DatabaseManager {
 
     let db: any;
     if (fs.existsSync(config.filePath)) {
+      const stats = fs.statSync(config.filePath);
+      console.log(`Loading database file: ${config.filePath} (size: ${stats.size} bytes)`);
       const filebuffer = fs.readFileSync(config.filePath);
       db = new this.sqlJs.Database(filebuffer);
     } else {

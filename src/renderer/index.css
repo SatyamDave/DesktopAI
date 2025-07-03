@@ -599,4 +599,75 @@ body, .glasschat-app, .glassmorphic, input, button {
     left: 10px;
     min-width: auto;
   }
+}
+
+/* Custom styles for DELO overlay */
+.region-selector {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.region-selector * {
+  pointer-events: none;
+}
+
+.region-selector.region-selector {
+  pointer-events: auto;
+}
+
+/* Animation for region selection */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+/* Ensure DELO overlay is above other elements but below region selector */
+.delo-overlay {
+  z-index: 50;
+}
+
+.region-overlay {
+  z-index: 9999;
+}
+
+/* Glassmorphic effect for DELO */
+.glass-effect {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Smooth transitions */
+.transition-all {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Custom scrollbar for chat messages */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 } 

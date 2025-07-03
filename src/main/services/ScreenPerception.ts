@@ -35,6 +35,7 @@ export class ScreenPerception {
   private diffThreshold = 0.1; // Minimum change threshold to trigger new snapshot
 
   constructor() {
+    console.log('ScreenPerception: constructor called');
     this.databaseManager = DatabaseManager.getInstance();
     this.performanceOptimizer = PerformanceOptimizer.getInstance();
     

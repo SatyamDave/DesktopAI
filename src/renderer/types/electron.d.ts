@@ -70,6 +70,14 @@ declare global {
       processDeloCommand: (command: string) => Promise<{ success: boolean; message: string; action: string; data?: any; nextAction?: string; requiresConfirmation?: boolean }>;
       getDeloSuggestions: () => Promise<{ success: boolean; suggestions?: string[]; error?: string }>;
       getDeloInsights: () => Promise<{ success: boolean; insights?: any; error?: string }>;
+      getDeloScreenSummary: () => Promise<{ success: boolean; summary: string; suggestions: string[]; error?: string }>;
+      // Overlay control
+      hideDeloOverlay: () => Promise<{ success: boolean; error?: string }>;
+      showDeloOverlay: () => Promise<{ success: boolean; error?: string }>;
+      // Screen capture and analysis
+      captureScreenRegion: (region: { x: number; y: number; width: number; height: number }) => Promise<{ success: boolean; summary: string; suggestions: string[]; text: string; error?: string }>;
+      captureFullScreen: () => Promise<{ success: boolean; summary: string; suggestions: string[]; text: string; error?: string }>;
+      readScreenText: () => Promise<{ success: boolean; text?: string; error?: string }>;
     };
     
     // DELO AI-Powered Features
