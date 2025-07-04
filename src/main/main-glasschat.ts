@@ -57,27 +57,18 @@ class GlassChatApp {
   private createMainWindow() {
     try {
       console.log('🚀 Starting GlassChat App...');
-      
-      // Get screen dimensions for full screen coverage
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-      
-      console.log('📱 Screen dimensions:', { screenWidth, screenHeight });
-      
+      // Overlay window: small, frameless, transparent, vibrancy, no shadow
       this.mainWindow = new BrowserWindow({
-        width: screenWidth,
-        height: screenHeight,
-        x: 0,
-        y: 0,
-        frame: false,
+        width: 400,
+        height: 56,
         transparent: true,
-        alwaysOnTop: true,
-        skipTaskbar: true,
+        frame: false,
         resizable: false,
-        minimizable: false,
-        maximizable: false,
-        show: false,
-        titleBarStyle: 'hidden',
+        hasShadow: false,
+        vibrancy: 'popover',
+        alwaysOnTop: true,
+        backgroundColor: '#00000000',
+        roundedCorners: true,
         webPreferences: {
           preload: path.join(__dirname, 'preload-working.js'),
           contextIsolation: true,
@@ -436,6 +427,21 @@ class GlassChatApp {
         platform: process.platform,
         fridayInitialized: this.fridayInitialized
       };
+    });
+
+    // Add moveOverlay IPC
+    ipcMain.on('moveOverlay', (e, { x, y }) => {
+      if (this.mainWindow) {
+        this.mainWindow.setPosition(Math.round(x), Math.round(y), false);
+      }
+    });
+
+    // Add resizeOverlay IPC
+    ipcMain.on('resizeOverlay', (e, { w, h }) => {
+      if (this.mainWindow) {
+        this.mainWindow.setSize(Math.round(w), Math.round(h), false);
+        this.mainWindow.setBackgroundColor('#00000000');
+      }
     });
 
     console.log('✅ IPC handlers setup complete');

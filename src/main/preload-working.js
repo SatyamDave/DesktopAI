@@ -17,7 +17,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Basic system info
   getAppStatus: () => ipcRenderer.invoke('get-app-status'),
   
-  captureFullScreen: () => ipcRenderer.invoke('captureFullScreen')
+  captureFullScreen: () => ipcRenderer.invoke('captureFullScreen'),
+  
+  moveOverlay: (x, y) => ipcRenderer.send('moveOverlay', { x, y }),
+  
+  resizeOverlay: (w, h) => ipcRenderer.send('resizeOverlay', { w, h }),
+});
+
+// Resize window to match overlay dimensions after DOM loads
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    const overlay = document.querySelector('#overlay');
+    if (overlay) {
+      const w = overlay.offsetWidth;
+      const h = overlay.offsetHeight;
+      if (w > 0 && h > 0) {
+        window.electronAPI.resizeOverlay(w, h);
+      }
+    }
+  }, 100);
 });
 
 // Expose Friday API to renderer process

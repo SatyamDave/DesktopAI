@@ -54,22 +54,6 @@ body {
   -webkit-app-region: no-drag;
 }
 
-/* Orb app container - minimal and transparent */
-.orb-app {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: transparent;
-  pointer-events: none;
-  z-index: 1000;
-}
-
-.orb-app * {
-  pointer-events: auto;
-}
-
 /* Main app container */
 .app {
   position: fixed;
@@ -311,16 +295,6 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-/* Glassmorphic container */
-.glassmorphic-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
-  background: transparent;
 }
 
 /* Settings overlay */

@@ -4,6 +4,13 @@
 
 html, body {
   background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  width: 400px !important;
+  height: 72px !important;
+  backdrop-filter: blur(14px) saturate(160%);
+  background: rgba(255,255,255,.08);
 }
 
 :root {
@@ -35,9 +42,14 @@ body {
 }
 
 #root {
-  width: 100vw;
-  height: 100vh;
-  background: transparent;
+  width: 400px !important;
+  height: 72px !important;
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  backdrop-filter: blur(14px) saturate(160%);
+  background: rgba(255,255,255,.08);
   /* Allow pointer events on the root for the glassmorphic UI */
   pointer-events: auto;
 }
@@ -599,4 +611,15 @@ body, .glasschat-app, .glassmorphic, input, button {
     left: 10px;
     min-width: auto;
   }
+}
+
+/* Force dark text/icons */
+svg path, svg rect, svg circle, svg line, svg polyline, svg polygon {
+  color: #fff !important;
+  mix-blend-mode: overlay !important;
+}
+
+svg {
+  color: #fff !important;
+  mix-blend-mode: overlay !important;
 } 

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, X, CheckCircle, AlertCircle, Loader2, Send, Monitor } from 'lucide-react';
+import { Mic, X, CheckCircle, AlertCircle, Loader2, Send, Monitor, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface FridayResult {
   success: boolean;
@@ -61,6 +61,16 @@ async function captureWindow() {
   if (res?.success) pushToast(res.summary);
 }
 
+declare global {
+  interface Window {
+    electronAPI: {
+      moveOverlay?: (x: number, y: number) => void;
+      resizeOverlay?: (w: number, h: number) => void;
+      [key: string]: any;
+    };
+  }
+}
+
 const GlassmorphicOverlay: React.FC<GlassmorphicOverlayProps> = function GlassmorphicOverlay({
   isVisible,
   onClose,
@@ -76,20 +86,51 @@ const GlassmorphicOverlay: React.FC<GlassmorphicOverlayProps> = function Glassmo
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsEndRef = useRef<HTMLDivElement>(null);
 
-  // Improved drag system with position persistence
+  // Improved drag system: move the window, not the div
   const [dragging, setDragging] = useState(false);
-  const [position, setPosition] = useState(() => {
-    const saved = localStorage.getItem("deloPos");
-    return saved ? JSON.parse(saved) : { x: 0, y: 0 };
-  });
   const dragOffset = useRef({ x: 0, y: 0 });
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number>();
+
+  const onMouseDown = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    setDragging(true);
+    dragOffset.current = {
+      x: e.screenX,
+      y: e.screenY,
+    };
+    document.body.style.userSelect = "none";
+  };
+  useEffect(() => {
+    if (!dragging) return;
+    const onMouseMove = (e: MouseEvent) => {
+      const overlay = document.getElementById('overlay');
+      if (window.electronAPI && window.electronAPI.moveOverlay && overlay) {
+        window.electronAPI.moveOverlay(e.screenX - overlay.offsetWidth / 2, e.screenY - 28);
+      }
+    };
+    const onMouseUp = () => {
+      setDragging(false);
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [dragging]);
+
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Auto-scroll to bottom when new results arrive
   useEffect(() => {
     resultsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [results]);
+
+  // Restore to original fixed size and normal dropdown
+  const shellW = 400;
+  const shellH = 56; // or 72 if you want taller bar
+  const chatRef = useRef<HTMLDivElement>(null);
 
   // Listen for transcript, suggestion, and answer events
   useEffect(() => {
@@ -117,27 +158,37 @@ const GlassmorphicOverlay: React.FC<GlassmorphicOverlayProps> = function Glassmo
 
   const handleCommand = useCallback(async (command: string) => {
     if (!command.trim() || isProcessing) return;
+    setIsCollapsed(false);
 
     const userResult: FridayResult = {
       success: true,
       message: command,
       data: { type: 'user-input' }
     };
-    setResults((prev: FridayResult[]) => [...prev, userResult]);
+    setResults((prev: FridayResult[]) => {
+      const next = [...prev, userResult];
+      return next;
+    });
 
     setIsProcessing(true);
     setInputValue('');
 
     try {
       const result = await onCommand(command);
-      setResults((prev: FridayResult[]) => [...prev, result]);
+      setResults((prev: FridayResult[]) => {
+        const next = [...prev, result];
+        return next;
+      });
     } catch (error) {
       const errorResult: FridayResult = {
         success: false,
         message: `Error: ${error}`,
         error: String(error)
       };
-      setResults((prev: FridayResult[]) => [...prev, errorResult]);
+      setResults((prev: FridayResult[]) => {
+        const next = [...prev, errorResult];
+        return next;
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -145,6 +196,7 @@ const GlassmorphicOverlay: React.FC<GlassmorphicOverlayProps> = function Glassmo
 
   const handleScreenSummary = useCallback(async () => {
     if (isScreenSummaryLoading || isProcessing) return;
+    setIsCollapsed(false);
 
     const userResult: FridayResult = {
       success: true,
@@ -177,68 +229,43 @@ const GlassmorphicOverlay: React.FC<GlassmorphicOverlayProps> = function Glassmo
     }
   };
 
-  // Improved drag logic
-  const onMouseDown = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-    setDragging(true);
-    dragOffset.current = {
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    };
-    document.body.style.userSelect = "none";
-  };
-  useEffect(() => {
-    if (!dragging) return;
-    const onMouseMove = (e: MouseEvent) => {
-      const next = {
-        x: e.clientX - dragOffset.current.x,
-        y: e.clientY - dragOffset.current.y,
-      };
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(() => {
-        setPosition(next);
-      });
-    };
-    const onMouseUp = () => {
-      setDragging(false);
-      localStorage.setItem("deloPos", JSON.stringify(position));
-      document.body.style.userSelect = "";
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [dragging, position]);
-
   if (!isVisible) return null;
 
   return (
     <AnimatePresence>
       <motion.div
-        ref={overlayRef}
+        id="overlay"
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1, x: position.x, y: position.y }}
+        animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3, ease: 'easeOut' }}
-        className="fixed z-50 pointer-events-auto"
+        className="z-50 pointer-events-auto"
         style={{
-          left: 0,
+          position: 'absolute',
           top: 0,
-          width: 400,
-          borderRadius: 24,
-          background: 'rgba(40,40,40,0.85)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          left: 0,
+          width: shellW,
+          height: shellH,
+          borderRadius: 18,
+          backdropFilter: 'blur(18px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+          background: 'rgba(30,30,30,.28)',
+          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.12)',
           overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-start',
+          alignItems: 'stretch',
+          padding: '0 12px',
+          margin: 0,
         }}
       >
-        {/* Input bar always at the top, draggable */}
-        <div className="flex items-center space-x-2 p-3 cursor-move select-none" onMouseDown={onMouseDown}>
+        {/* Header bar */}
+        <div
+          className="flex items-center space-x-2 w-full cursor-move select-none"
+          style={{height: shellH, minHeight: shellH, background: 'transparent', boxShadow: 'none'}}
+          onMouseDown={onMouseDown}
+        >
           <input
             ref={inputRef}
             type="text"
@@ -246,17 +273,37 @@ const GlassmorphicOverlay: React.FC<GlassmorphicOverlayProps> = function Glassmo
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask Friday anything..."
-            className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 text-white/90 placeholder-white/50 focus:outline-none focus:border-white/40 text-sm"
+            className="flex-1 rounded-lg px-4 py-2 text-white/90 placeholder-white/50 focus:outline-none focus:border-white/40 text-sm"
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,.18)',
+              height: 36,
+              marginTop: 0,
+              marginBottom: 0,
+            }}
             disabled={isProcessing}
           />
           <button
             onClick={handleScreenSummary}
             disabled={isScreenSummaryLoading || isProcessing}
-            className="px-2 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all duration-200 font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-2 py-2 rounded-lg transition-all duration-200 font-medium flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: 'rgba(52,211,153,0.15)',
+              border: '1px solid rgba(52,211,153,0.25)',
+              height: 36,
+              width: 36,
+              minWidth: 36,
+              minHeight: 36,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 4,
+              marginRight: 0,
+            }}
             title="Capture and summarize screen content"
           >
             {isScreenSummaryLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4" />
             ) : (
               <Monitor className="w-4 h-4" />
             )}
@@ -264,25 +311,69 @@ const GlassmorphicOverlay: React.FC<GlassmorphicOverlayProps> = function Glassmo
           <button
             onClick={() => handleCommand(inputValue)}
             disabled={!inputValue.trim() || isProcessing}
-            className="px-2 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all duration-200 font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-2 py-2 rounded-lg transition-all duration-200 font-medium flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: 'rgba(59,130,246,0.15)',
+              border: '1px solid rgba(59,130,246,0.25)',
+              height: 36,
+              width: 36,
+              minWidth: 36,
+              minHeight: 36,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 4,
+              marginRight: 0,
+            }}
           >
             <Send className="w-4 h-4" />
           </button>
-          <button onClick={onClose} className="ml-2 text-white/80 hover:text-white">
+          <button
+            onClick={onClose}
+            className="ml-2 text-white/80 hover:text-white rounded-lg transition"
+            style={{height: 36, width: 36, minWidth: 36, minHeight: 36, marginLeft: 8, background: 'rgba(255,255,255,0.08)'}}
+          >
             <X className="w-5 h-5" />
           </button>
+          {results.length > 0 && !isCollapsed && (
+            <button
+              onClick={() => setIsCollapsed(true)}
+              className="ml-1 p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition"
+              style={{height: 36, width: 36, minWidth: 36, minHeight: 36, marginLeft: 4, background: 'rgba(255,255,255,0.08)'}}
+              title="Collapse chat"
+            >
+              <ChevronUp className="w-5 h-5" />
+            </button>
+          )}
+          {isCollapsed && (results.length > 0 || isProcessing) && (
+            <button
+              onClick={() => setIsCollapsed(false)}
+              className="ml-1 p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition"
+              style={{height: 36, width: 36, minWidth: 36, minHeight: 36, marginLeft: 4, background: 'rgba(255,255,255,0.08)'}}
+              title="Expand chat"
+            >
+              <ChevronDown className="w-5 h-5" />
+            </button>
+          )}
         </div>
         {/* Dropdown chat area below input bar, animated */}
         <AnimatePresence>
-          {results.length > 0 && (
+          {results.length > 0 && !isCollapsed && (
             <motion.div
               key="chat-dropdown"
+              ref={chatRef}
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3, ease: 'easeOut' }}
               className="overflow-y-auto px-4 pb-4 space-y-3 border-t border-white/10"
-              style={{ maxHeight: 320 }}
+              style={{ 
+                pointerEvents: 'auto',
+                margin: 0,
+                padding: '12px 0 16px 0',
+                background: 'transparent',
+                borderRadius: 0
+              }}
             >
               {results.map((result, index) => (
                 <motion.div

@@ -22,7 +22,7 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <>
+    <div style={{ width: '400px', height: '72px', background: 'transparent', margin: 0, padding: 0, overflow: 'hidden' }}>
       <ToastHost />
       <ScreenHooks />
       <GlassmorphicOverlay
@@ -44,7 +44,7 @@ const App: React.FC = () => {
         stats={null}
       />
       <MicIndicator live={isMicLive} />
-    </>
+    </div>
   );
 };
 
