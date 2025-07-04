@@ -1,0 +1,8 @@
+name: summarize_screen
+description: Summarize the visible content on the user's screen using OCR.
+parameters:
+  type: object
+  properties: {}
+  required: []
+version: 1.0.0
+author: Friday Team 

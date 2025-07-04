@@ -74,7 +74,7 @@ export class IntentParser {
       messages,
       tools,
       tool_choice: 'auto',
-      max_tokens: 1024
+      max_tokens: 512
     };
     const headers = {
       'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
@@ -240,6 +240,17 @@ Always use function calls for automation tasks.`;
       };
     }
     
+    // Robust screen summary matching
+    const screenSummaryRegex = /\b(screen|page|see|summarize|summarise|visible|look at|what do you see|what am i looking at|what is on my screen|can you summarize|summarize this|summarize everything|summarize all|summarize what you see|summarize what is on the screen|summarize the screen|summarize what i see|summarize what is visible|summarize this whole thing|what do you see on my screen|what is visible on my screen|screen summary|page summary)\b/;
+    if (screenSummaryRegex.test(lowerText)) {
+      return {
+        functionName: 'summarize_screen',
+        arguments: {},
+        confidence: 0.95,
+        reasoning: 'Screen summary request detected (robust matching).'
+      };
+    }
+    
     // Check for available tools by name
     const availableTools = registry.getManifests().map(f => f.name);
     for (const tool of availableTools) {
@@ -267,16 +278,12 @@ Always use function calls for automation tasks.`;
       };
     }
     
-    // Last resort: generic fallback_request
+    // If nothing else matches, treat as a conversation/chat
     return {
-      functionName: 'fallback_request',
-      arguments: {
-        reason: 'unknown_action',
-        proposal: `I can help you with this request. Would you like me to install the necessary app, set up automation, or guide you through the process?`,
-        details: { action: userText }
-      },
-      confidence: 0.3,
-      reasoning: 'No specific pattern matched, offering general assistance.'
+      functionName: 'conversation',
+      arguments: { response: userText },
+      confidence: 0.5,
+      reasoning: 'No automation matched, treating as chat.'
     };
   }
 

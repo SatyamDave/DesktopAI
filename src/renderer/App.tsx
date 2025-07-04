@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import './App.css';
 import GlassmorphicOverlay from './components/GlassmorphicOverlay';
 import MicIndicator from '../ui/MicIndicator';
+import { ToastHost } from './components/makeToast';
+import ScreenHooks from './components/ScreenHooks';
 
 const App: React.FC = () => {
   const [isMicLive, setIsMicLive] = useState(false);
@@ -21,6 +23,8 @@ const App: React.FC = () => {
 
   return (
     <>
+      <ToastHost />
+      <ScreenHooks />
       <GlassmorphicOverlay
         isVisible={true}
         onClose={() => {}}

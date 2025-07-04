@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Basic system info
   getAppStatus: () => ipcRenderer.invoke('get-app-status'),
+  
+  captureFullScreen: () => ipcRenderer.invoke('captureFullScreen')
 });
 
 // Expose Friday API to renderer process

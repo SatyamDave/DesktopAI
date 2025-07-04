@@ -109,4 +109,24 @@ packages/
 .doppel/
 
 # TypeScript
-*.tsbuildinfo 
+*.tsbuildinfo
+
+# Build Output
+/dist/
+/build/
+/out/
+/release/
+
+# Platform-Specific
+.DS_Store
+Thumbs.db
+
+# Editor-specific
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Electron Cache
+*.asar 

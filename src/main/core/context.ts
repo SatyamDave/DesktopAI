@@ -5,6 +5,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import Tesseract from 'tesseract.js';
 import screenshot from 'screenshot-desktop';
+import fs from 'fs';
 
 const execAsync = promisify(exec);
 
@@ -163,19 +164,52 @@ export class ContextManager {
         return cached.text;
       }
 
-      // Take screenshot
-      const imgBuffer = await screenshot();
-      
-      // Perform OCR
-      const result = await Tesseract.recognize(imgBuffer, 'eng', {
-        logger: m => {
-          if (this.debug) {
-            this.log('OCR progress:', m);
+      // macOS: Check for Screen Recording permission
+      if (os.platform() === 'darwin') {
+        const tccDb = '/Library/Application Support/com.apple.TCC/TCC.db';
+        if (fs.existsSync(tccDb)) {
+          try {
+            const { stdout } = await execAsync(`sqlite3 "${tccDb}" "SELECT * FROM access WHERE service='kTCCServiceScreenCapture' AND client LIKE '%your-app-bundle-id%'"`);
+            if (!stdout.includes('1')) {
+              this.log('Screen Recording permission not granted.');
+              return 'Screen Recording permission not granted. Please enable it in System Preferences > Security & Privacy > Screen Recording.';
+            }
+          } catch (e) {
+            // Ignore errors, just log
+            this.log('Could not check Screen Recording permission:', e);
           }
         }
-      });
+      }
+
+      // Take screenshot
+      let imgBuffer;
+      try {
+        imgBuffer = await screenshot();
+      } catch (screenshotError) {
+        this.log('Screenshot failed:', screenshotError);
+        return 'Screen capture failed. Please check permissions and try again.';
+      }
+      
+      // Perform OCR
+      let result;
+      try {
+        result = await Tesseract.recognize(imgBuffer, 'eng', {
+          logger: m => {
+            if (this.debug) {
+              this.log('OCR progress:', m);
+            }
+          }
+        });
+      } catch (ocrError) {
+        this.log('OCR failed:', ocrError);
+        return 'OCR failed. Please check that your screen has visible text and try again.';
+      }
 
       const text = result.data.text.trim();
+      if (!text) {
+        this.log('OCR returned empty text.');
+        return 'No text found on screen. Make sure there is visible, high-contrast text.';
+      }
       
       // Cache the result
       this.ocrCache.set(cacheKey, {
@@ -183,10 +217,16 @@ export class ContextManager {
         timestamp: Date.now()
       });
 
-      return text || undefined;
+      return text;
     } catch (error) {
       this.log('Error getting screen text:', error);
-      return undefined;
+      let msg = 'Screen OCR failed: ';
+      if (typeof error === 'object' && error && 'message' in error) {
+        msg += (error as any).message;
+      } else {
+        msg += String(error);
+      }
+      return msg;
     }
   }
 
