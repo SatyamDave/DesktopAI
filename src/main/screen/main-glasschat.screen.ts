@@ -336,9 +336,12 @@ Format your response as JSON:
           const text = response.choices?.[0]?.message?.content || '';
           return { success: true, result: text };
         } else {
-          // Use Groq API (OpenAI-compatible)
-          const apiKey = process.env.GROQ_API_KEY || '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';
-          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        // Use Groq API (OpenAI-compatible)
+        const apiKey = process.env.GROQ_API_KEY;
+        if (!apiKey) {
+          return { success: false, error: 'GROQ API key not set.' };
+        }
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${apiKey}`,
@@ -381,7 +384,8 @@ Format your response as JSON:
           // Fallback to Groq LLM
           try {
             console.log('[Friday] Falling back to Groq LLM...');
-            const apiKey = process.env.GROQ_API_KEY || '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';
+            const apiKey = process.env.GROQ_API_KEY;
+            if (!apiKey) return { success: false, message: 'GROQ API key not set.' };
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
               method: 'POST',
               headers: {
@@ -1040,7 +1044,10 @@ Format your response as JSON:
         }
       } else {
         // Use Groq API (OpenAI-compatible)
-        const apiKey = process.env.GROQ_API_KEY || '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';
+        const apiKey = process.env.GROQ_API_KEY;
+        if (!apiKey) {
+          return { success: false, error: 'GROQ API key not set.' };
+        }
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
